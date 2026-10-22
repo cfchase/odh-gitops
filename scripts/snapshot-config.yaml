@@ -25,6 +25,12 @@ charts:
           - skipCrdCheck=true
           - operator.type=rhoai
 
+      - name: operator-with-external-namespace
+        setFlags:
+          - skipCrdCheck=true
+          - operator.type=rhoai
+          - operator.rhoai.olm.createNamespace=false
+
       - name: all-components-managed
         valuesFiles:
           - docs/examples/values-all-components-managed.yaml
