@@ -1,0 +1,22 @@
+{{- $dep := .Values.dependencies.rhcl -}}
+{{- $shouldInstall := include "rhoai-dependencies.shouldInstall" (dict "dependencyName" "rhcl" "dependency" $dep "root" $) -}}
+{{- if eq $shouldInstall "true" }}
+{{- if $dep.config.kuadrantOperatorAuthServiceTimeout }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kuadrant-operator-controller-manager
+  namespace: {{ $dep.olm.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-options: ServerSideApply=true,Validate=false,DisableClientSideApplyMigration=true,Prune=false,Delete=false
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  template:
+    spec:
+      containers:
+        - name: manager
+          env:
+            - name: AUTH_SERVICE_TIMEOUT
+              value: {{ $dep.config.kuadrantOperatorAuthServiceTimeout | quote }}
+{{- end }}
+{{- end }}

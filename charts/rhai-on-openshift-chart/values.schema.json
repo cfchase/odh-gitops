@@ -1042,6 +1042,11 @@
               "default": false,
               "description": "Trust the OpenShift Service CA in Authorino while retaining platform CA trust"
             },
+            "kuadrantOperatorAuthServiceTimeout": {
+              "type": "string",
+              "default": "",
+              "description": "Optional Kuadrant operator auth-service timeout (for example, 1s)"
+            },
             "spec": {
               "type": "object",
               "description": "Kuadrant CR spec fields - user can add any fields",

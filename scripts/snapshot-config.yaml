@@ -175,6 +175,12 @@ charts:
           - profile=maas
           - dependencies.rhcl.config.authorinoServiceCaTrust=false
 
+      - name: argocd-kuadrant-auth-timeout
+        setFlags:
+          - skipCrdCheck=true
+          - profile=maas
+          - dependencies.rhcl.config.kuadrantOperatorAuthServiceTimeout=1s
+
       - name: maas-profile
         setFlags:
           - skipCrdCheck=true

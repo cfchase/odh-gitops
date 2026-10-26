@@ -849,6 +849,10 @@ Go loads trusted roots when Authorino starts. After the OpenShift Service CA rot
 
 On a fresh installation, the Authorino operator may not have created `Deployment/authorino` before Argo CD applies the wave-10 patch. Configure the retry policy shown in the example Application so Argo CD retries the same revision after the Deployment exists.
 
+### Tune the Kuadrant auth-service timeout
+
+Kuadrant configures its Wasm auth call with a `200ms` timeout by default. For cross-cluster OIDC providers or other higher-latency authorization chains, set `dependencies.rhcl.config.kuadrantOperatorAuthServiceTimeout` to a Go duration such as `1s`. The chart emits a partial Deployment patch intended for Argo CD server-side apply against the OLM-managed `kuadrant-operator-controller-manager`; the Kuadrant operator then uses the value when it regenerates Gateway `EnvoyFilter` resources.
+
 ## Troubleshooting
 
 ### CRs not being created
