@@ -43,9 +43,7 @@ A Helm chart for installing ODH/RHOAI dependencies and component configurations
 | components.dashboard | object | `{"dependencies":{},"dsc":{"maasPortal":{"managementState":null},"standard":{"managementState":null}}}` | Dashboard component (structural in DSC v3: no component-level managementState; the core Dashboard and the MaaS Consumer Portal are managed independently) |
 | components.dashboard.dependencies | object | `{}` | Dependencies required by Dashboard |
 | components.dashboard.dsc | object | `{"maasPortal":{"managementState":null},"standard":{"managementState":null}}` | DSC configuration for Dashboard |
-| components.dashboard.dsc.maasPortal | object | `{"managementState":null}` | MaaS Portal sub-component |
 | components.dashboard.dsc.maasPortal.managementState | string | `nil` | Management state for the MaaS Consumer Portal. Null uses profile default. |
-| components.dashboard.dsc.maasPortal.managementState | string | `nil` | Management state for MaaS Portal. Null uses profile default. |
 | components.dashboard.dsc.standard.managementState | string | `nil` | Management state for the core Dashboard. Null uses profile default. |
 | components.data | object | `{"dependencies":{},"dsc":{"dataRegistry":{"managementState":null},"featureStore":{"managementState":null}}}` | Data component (structural in DSC v3: no component-level managementState). Replaces feastoperator (featureStore) from DSC v2; dataRegistry is new in v3. |
 | components.data.dependencies | object | `{}` | Dependencies required by Data |

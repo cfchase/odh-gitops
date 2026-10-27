@@ -205,10 +205,6 @@ components:
       maasPortal:
         # -- Management state for the MaaS Consumer Portal. Null uses profile default.
         managementState:
-      # -- MaaS Portal sub-component
-      maasPortal:
-        # -- Management state for MaaS Portal. Null uses profile default.
-        managementState:
 
   # -- Data component (structural in DSC v3: no component-level managementState). Replaces feastoperator (featureStore) from DSC v2; dataRegistry is new in v3.
   data:
