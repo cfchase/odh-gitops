@@ -164,7 +164,7 @@ spec:
 
 ---
 # Source: rhai-on-openshift-chart/templates/operator/datasciencecluster.yaml
-apiVersion: datasciencecluster.opendatahub.io/v2
+apiVersion: datasciencecluster.opendatahub.io/v3
 kind: DataScienceCluster
 metadata:
   name: default-dsc
@@ -173,6 +173,9 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 spec:
   components:
+    aiHub:
+      instancesNamespace: odh-model-registry
+      managementState: Managed
     aigateway:
       batchGateway:
         managementState: Removed
@@ -182,27 +185,30 @@ spec:
     aipipelines:
       managementState: Managed
     dashboard:
-      maasConsumerPortal:
-        managementState: Removed
-      managementState: Managed
-    feastoperator:
-      managementState: Managed
+      maasPortal:
+        managementState: Managed
+      standard:
+        managementState: Managed
+    data:
+      dataRegistry:
+        managementState: Managed
+      featureStore:
+        managementState: Managed
     kserve:
       managementState: Managed
+      modelExpress:
+        managementState: Managed
       nim:
         managementState: Managed
       rawDeploymentServiceConfig: Headless
-      wva:
-        managementState: Managed
     kueue:
       defaultClusterQueueName: default
       defaultLocalQueueName: default
       managementState: Unmanaged
+    mcplifecycleoperator:
+      managementState: Managed
     mlflowoperator:
       managementState: Managed
-    modelregistry:
-      managementState: Managed
-      registriesNamespace: odh-model-registry
     ogx:
       managementState: Managed
     ray:
@@ -210,8 +216,6 @@ spec:
     sparkoperator:
       managementState: Managed
     trainer:
-      managementState: Managed
-    trainingoperator:
       managementState: Managed
     trustyai:
       eval:
@@ -222,6 +226,8 @@ spec:
     workbenches:
       managementState: Managed
       workbenchNamespace: opendatahub
+      workbenchesV2:
+        managementState: Managed
 
 ---
 # Source: rhai-on-openshift-chart/templates/dependencies/gateway/kserve-gatewayclass.yaml
@@ -375,7 +381,7 @@ spec:
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
-  name: cluster-observability-operator
+  name: openshift-cluster-observability-operator
   namespace: openshift-cluster-observability-operator
   labels:
     helm.sh/chart: HELM_CHART_VERSION_REDACTED

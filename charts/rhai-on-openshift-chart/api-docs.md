@@ -1,14 +1,31 @@
 # rhai-on-openshift-chart
 
-![Version: 3.4.0](https://img.shields.io/badge/Version-3.4.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 3.4.0](https://img.shields.io/badge/AppVersion-3.4.0-informational?style=flat-square)
+![Version: 3.6.0](https://img.shields.io/badge/Version-3.6.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 3.6.0](https://img.shields.io/badge/AppVersion-3.6.0-informational?style=flat-square)
 
 A Helm chart for installing ODH/RHOAI dependencies and component configurations
+
+## Requirements
+
+| Repository | Name | Version |
+|------------|------|---------|
+|  | ai-grid-o11y-hub | 0.1.0 |
+|  | ai-grid-o11y-spoke | 0.1.0 |
+|  | grid-enrollment | 0.2.2 |
+|  | praxis-gateway | 0.2.2 |
 
 ## Values
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| components.aigateway | object | `{"dependencies":{"certManager":null,"leaderWorkerSet":null,"rhcl":null},"dsc":{"batchGateway":{"managementState":null},"managementState":null,"modelsAsAService":{"managementState":null}},"modelsAsAService":{"gateway":{"annotations":{"opendatahub.io/managed":"false","security.opendatahub.io/authorino-tls-bootstrap":"true"},"create":"auto","name":"maas-default-gateway","namespace":"openshift-ingress","openshiftRoute":{"enabled":false,"gatewayParametersName":"maas-gateway-options","host":"","name":"maas-gateway-route","servingCertSecretName":"maas-gw-service-tls"},"spec":{"gatewayClassName":"maas-gateway-class","listeners":[{"allowedRoutes":{"namespaces":null},"name":"https","port":443,"protocol":"HTTPS"}]}},"gatewayClass":{"create":"auto","name":"maas-gateway-class","spec":{"controllerName":"openshift.io/gateway-controller/v1"}}}}` | AI Gateway component (manages MaaS and BatchGateway sub-components) |
+| ai-grid-o11y-hub | object | `{"enabled":false}` | AI Grid observability hub subchart |
+| ai-grid-o11y-spoke | object | `{"enabled":false}` | AI Grid observability spoke subchart |
+| components.aiHub | object | `{"defaults":{"odh":{"instancesNamespace":"odh-model-registry"},"rhoai":{"instancesNamespace":"rhoai-model-registries"}},"dependencies":{},"dsc":{"instancesNamespace":null,"managementState":null}}` | AI Hub component (Model Registry; replaces modelregistry from DSC v2) |
+| components.aiHub.defaults | object | `{"odh":{"instancesNamespace":"odh-model-registry"},"rhoai":{"instancesNamespace":"rhoai-model-registries"}}` | Operator-type-specific defaults for dsc fields |
+| components.aiHub.dependencies | object | `{}` | Dependencies required by AI Hub |
+| components.aiHub.dsc | object | `{"instancesNamespace":null,"managementState":null}` | DSC configuration for AI Hub |
+| components.aiHub.dsc.instancesNamespace | string | `nil` | Namespace for model registry instances (overrides defaults). Immutable in the operator while managementState is Managed. |
+| components.aiHub.dsc.managementState | string | `nil` | Management state for AI Hub. Null uses profile default. |
+| components.aigateway | object | `{"dependencies":{"certManager":null,"leaderWorkerSet":null,"rhcl":null},"dsc":{"batchGateway":{"managementState":null},"managementState":null,"modelsAsAService":{"managementState":null}},"modelsAsAService":{"gateway":{"annotations":{"opendatahub.io/managed":"false","security.opendatahub.io/authorino-tls-bootstrap":"true"},"create":"auto","name":"maas-default-gateway","namespace":"openshift-ingress","openshiftRoute":{"enabled":false,"gatewayParametersName":"maas-gateway-options","host":"","name":"maas-gateway-route","servingCertSecretName":"maas-gw-service-tls"},"spec":{"gatewayClassName":"maas-gateway-class","listeners":[{"allowedRoutes":{"namespaces":null},"name":"https","port":443,"protocol":"HTTPS"}]}},"gatewayClass":{"create":"auto","name":"maas-gateway-class","spec":{"controllerName":"openshift.io/gateway-controller/v1"}}}}` | AI Gateway component (manages MaaS, BatchGateway, and AI Grid sub-components) |
 | components.aigateway.dsc | object | `{"batchGateway":{"managementState":null},"managementState":null,"modelsAsAService":{"managementState":null}}` | DSC configuration for AI Gateway |
 | components.aigateway.dsc.managementState | string | `nil` | Management state for AI Gateway. Null uses profile default. |
 | components.aigateway.dsc.modelsAsAService | object | `{"managementState":null}` | Models as a Service sub-component (moved from kserve.modelsAsService in 3.5) |
@@ -23,25 +40,28 @@ A Helm chart for installing ODH/RHOAI dependencies and component configurations
 | components.aipipelines | object | `{"dependencies":{},"dsc":{"managementState":null}}` | AI Pipelines component |
 | components.aipipelines.dependencies | object | `{}` | Dependencies required by AI Pipelines |
 | components.aipipelines.dsc.managementState | string | `nil` | Management state for AI Pipelines. Null uses profile default. |
-| components.dashboard | object | `{"dependencies":{},"dsc":{"maasConsumerPortal":{"managementState":null},"managementState":null}}` | Dashboard component |
+| components.dashboard | object | `{"dependencies":{},"dsc":{"maasPortal":{"managementState":null},"standard":{"managementState":null}}}` | Dashboard component (structural in DSC v3: no component-level managementState; the core Dashboard and the MaaS Consumer Portal are managed independently) |
 | components.dashboard.dependencies | object | `{}` | Dependencies required by Dashboard |
-| components.dashboard.dsc.maasConsumerPortal | object | `{"managementState":null}` | MaaS Consumer Portal sub-component |
-| components.dashboard.dsc.maasConsumerPortal.managementState | string | `nil` | Management state for MaaS Consumer Portal. Null uses profile default. |
-| components.dashboard.dsc.managementState | string | `nil` | Management state for Dashboard. Null uses profile default. |
-| components.feastoperator | object | `{"dependencies":{},"dsc":{"managementState":null}}` | Feast Operator component |
-| components.feastoperator.dependencies | object | `{}` | Dependencies required by Feast Operator |
-| components.feastoperator.dsc | object | `{"managementState":null}` | DSC configuration for Feast Operator |
-| components.feastoperator.dsc.managementState | string | `nil` | Management state for Feast Operator. Null uses profile default. |
-| components.kserve | object | `{"dependencies":{"certManager":true,"customMetricsAutoscaler":false,"jobSet":null,"leaderWorkerSet":false,"rhcl":true},"dsc":{"managementState":null,"nim":{"managementState":null},"rawDeploymentServiceConfig":"Headless","wva":{"managementState":null}},"gateway":{"create":"auto","labels":{"istio.io/rev":"openshift-gateway"},"name":"openshift-ai-inference","namespace":"openshift-ingress","spec":{"gatewayClassName":"openshift-ai-inference","listeners":[{"allowedRoutes":{"namespaces":null},"name":"https","port":443,"protocol":"HTTPS"}]}},"gatewayClass":{"create":"auto","name":"openshift-ai-inference","spec":{"controllerName":"openshift.io/gateway-controller/v1"}}}` | KServe model serving component |
+| components.dashboard.dsc | object | `{"maasPortal":{"managementState":null},"standard":{"managementState":null}}` | DSC configuration for Dashboard |
+| components.dashboard.dsc.maasPortal | object | `{"managementState":null}` | MaaS Portal sub-component |
+| components.dashboard.dsc.maasPortal.managementState | string | `nil` | Management state for the MaaS Consumer Portal. Null uses profile default. |
+| components.dashboard.dsc.maasPortal.managementState | string | `nil` | Management state for MaaS Portal. Null uses profile default. |
+| components.dashboard.dsc.standard.managementState | string | `nil` | Management state for the core Dashboard. Null uses profile default. |
+| components.data | object | `{"dependencies":{},"dsc":{"dataRegistry":{"managementState":null},"featureStore":{"managementState":null}}}` | Data component (structural in DSC v3: no component-level managementState). Replaces feastoperator (featureStore) from DSC v2; dataRegistry is new in v3. |
+| components.data.dependencies | object | `{}` | Dependencies required by Data |
+| components.data.dsc | object | `{"dataRegistry":{"managementState":null},"featureStore":{"managementState":null}}` | DSC configuration for Data |
+| components.data.dsc.dataRegistry.managementState | string | `nil` | Management state for Data Registry. Null uses profile default. |
+| components.data.dsc.featureStore.managementState | string | `nil` | Management state for Feature Store. Null uses profile default. |
+| components.kserve | object | `{"dependencies":{"certManager":true,"customMetricsAutoscaler":false,"jobSet":null,"leaderWorkerSet":false,"rhcl":true},"dsc":{"managementState":null,"modelExpress":{"managementState":null},"nim":{"managementState":null},"rawDeploymentServiceConfig":"Headless"},"gateway":{"create":"auto","labels":{"istio.io/rev":"openshift-gateway"},"name":"openshift-ai-inference","namespace":"openshift-ingress","spec":{"gatewayClassName":"openshift-ai-inference","listeners":[{"allowedRoutes":{"namespaces":null},"name":"https","port":443,"protocol":"HTTPS"}]}},"gatewayClass":{"create":"auto","name":"openshift-ai-inference","spec":{"controllerName":"openshift.io/gateway-controller/v1"}}}` | KServe model serving component |
 | components.kserve.dependencies | object | `{"certManager":true,"customMetricsAutoscaler":false,"jobSet":null,"leaderWorkerSet":false,"rhcl":true}` | Dependencies required by KServe (set to false to disable) |
 | components.kserve.dependencies.jobSet | string | `nil` | JobSet dependency. Null uses profile default (true for default, false for rhaii). |
-| components.kserve.dsc | object | `{"managementState":null,"nim":{"managementState":null},"rawDeploymentServiceConfig":"Headless","wva":{"managementState":null}}` | DSC configuration for KServe |
+| components.kserve.dsc | object | `{"managementState":null,"modelExpress":{"managementState":null},"nim":{"managementState":null},"rawDeploymentServiceConfig":"Headless"}` | DSC configuration for KServe |
 | components.kserve.dsc.managementState | string | `nil` | Management state for KServe. Null uses profile default. |
+| components.kserve.dsc.modelExpress | object | `{"managementState":null}` | Enables ModelExpress, a model cache and GPU-to-GPU weight transfer service for distributed model serving (Tech Preview) |
+| components.kserve.dsc.modelExpress.managementState | string | `nil` | Management state for ModelExpress. Null uses profile default. |
 | components.kserve.dsc.nim | object | `{"managementState":null}` | Enables NVIDIA NIM integration |
 | components.kserve.dsc.nim.managementState | string | `nil` | Management state for NIM. Null uses profile default. |
 | components.kserve.dsc.rawDeploymentServiceConfig | string | `"Headless"` | Raw deployment service config for KServe (Headless or Headed) |
-| components.kserve.dsc.wva | object | `{"managementState":null}` | Note: When run on Openshift, and set to Managed ensure Custom Metrics Autoscaler (CMA) or Prometheus Adapter is installed |
-| components.kserve.dsc.wva.managementState | string | `nil` | Management state for workload-variant-autoscaler. Null uses profile default. |
 | components.kserve.gateway | object | `{"create":"auto","labels":{"istio.io/rev":"openshift-gateway"},"name":"openshift-ai-inference","namespace":"openshift-ingress","spec":{"gatewayClassName":"openshift-ai-inference","listeners":[{"allowedRoutes":{"namespaces":null},"name":"https","port":443,"protocol":"HTTPS"}]}}` | Gateway configuration for KServe inference. |
 | components.kserve.gateway.create | string | `"auto"` | Flag to create the Gateway (auto, true, false). If auto, it will be created if KServe is Managed. |
 | components.kserve.gateway.spec.listeners[0].allowedRoutes.namespaces | string | `nil` | REQUIRED: set `from` to Selector (recommended) or Same. Template will fail if not set. When using Selector, the specified labels must be applied to each target namespace. |
@@ -53,16 +73,14 @@ A Helm chart for installing ODH/RHOAI dependencies and component configurations
 | components.kueue.dependencies | object | `{"certManager":true,"kueue":true}` | Dependencies required by Kueue |
 | components.kueue.dsc | object | `{"defaultClusterQueueName":"default","defaultLocalQueueName":"default","managementState":null}` | DSC configuration for Kueue |
 | components.kueue.dsc.managementState | string | `nil` | Management state for Kueue. Null uses profile default. |
+| components.mcplifecycleoperator | object | `{"dependencies":{},"dsc":{"managementState":null}}` | MCP Lifecycle Operator component (new in DSC v3) |
+| components.mcplifecycleoperator.dependencies | object | `{}` | Dependencies required by MCP Lifecycle Operator |
+| components.mcplifecycleoperator.dsc | object | `{"managementState":null}` | DSC configuration for MCP Lifecycle Operator |
+| components.mcplifecycleoperator.dsc.managementState | string | `nil` | Management state for MCP Lifecycle Operator. Null uses profile default. |
 | components.mlflowoperator | object | `{"dependencies":{},"dsc":{"managementState":null}}` | MLflow Operator component |
 | components.mlflowoperator.dependencies | object | `{}` | Dependencies required by MLflow Operator |
 | components.mlflowoperator.dsc | object | `{"managementState":null}` | DSC configuration for MLflow Operator |
 | components.mlflowoperator.dsc.managementState | string | `nil` | Management state for MLflow Operator. Null uses profile default. |
-| components.modelregistry | object | `{"defaults":{"odh":{"registriesNamespace":"odh-model-registry"},"rhoai":{"registriesNamespace":"rhoai-model-registries"}},"dependencies":{},"dsc":{"managementState":null,"registriesNamespace":null}}` | Model Registry component |
-| components.modelregistry.defaults | object | `{"odh":{"registriesNamespace":"odh-model-registry"},"rhoai":{"registriesNamespace":"rhoai-model-registries"}}` | Operator-type-specific defaults for dsc fields |
-| components.modelregistry.dependencies | object | `{}` | Dependencies required by Model Registry |
-| components.modelregistry.dsc | object | `{"managementState":null,"registriesNamespace":null}` | DSC configuration for Model Registry |
-| components.modelregistry.dsc.managementState | string | `nil` | Management state for Model Registry. Null uses profile default. |
-| components.modelregistry.dsc.registriesNamespace | string | `nil` | Registries namespace for Model Registry (overrides defaults) |
 | components.ogx | object | `{"dependencies":{"nfd":true,"nvidiaGPUOperator":true},"dsc":{"managementState":null}}` | OGX component |
 | components.ogx.dependencies | object | `{"nfd":true,"nvidiaGPUOperator":true}` | Dependencies required by OGX |
 | components.ogx.dsc | object | `{"managementState":null}` | DSC configuration for OGX |
@@ -79,27 +97,29 @@ A Helm chart for installing ODH/RHOAI dependencies and component configurations
 | components.trainer.dependencies | object | `{"certManager":true,"jobSet":true}` | Dependencies required by Trainer |
 | components.trainer.dsc | object | `{"managementState":null}` | DSC configuration for Trainer |
 | components.trainer.dsc.managementState | string | `nil` | Management state for Trainer. Null uses profile default. |
-| components.trainingoperator | object | `{"dependencies":{},"dsc":{"managementState":null}}` | Kubeflow Training Operator component |
-| components.trainingoperator.dependencies | object | `{}` | Dependencies required by Kubeflow Training Operator |
-| components.trainingoperator.dsc | object | `{"managementState":null}` | DSC configuration for Kubeflow Training Operator |
-| components.trainingoperator.dsc.managementState | string | `nil` | Management state for Kubeflow Training Operator. Null uses profile default. |
 | components.trustyai | object | `{"dependencies":{},"dsc":{"eval":{"lmeval":{"permitCodeExecution":"deny","permitOnline":"deny"}},"managementState":null}}` | TrustyAI component |
 | components.trustyai.dependencies | object | `{}` | Dependencies required by TrustyAI |
 | components.trustyai.dsc | object | `{"eval":{"lmeval":{"permitCodeExecution":"deny","permitOnline":"deny"}},"managementState":null}` | DSC configuration for TrustyAI |
 | components.trustyai.dsc.eval | object | `{"lmeval":{"permitCodeExecution":"deny","permitOnline":"deny"}}` | Evaluation configuration for TrustyAI evaluations |
 | components.trustyai.dsc.managementState | string | `nil` | Management state for TrustyAI. Null uses profile default. |
-| components.workbenches | object | `{"defaults":{"odh":{"workbenchNamespace":"opendatahub"},"rhoai":{"workbenchNamespace":"rhods-notebooks"}},"dependencies":{},"dsc":{"managementState":null,"workbenchNamespace":null}}` | Workbenches component |
+| components.workbenches | object | `{"defaults":{"odh":{"workbenchNamespace":"opendatahub"},"rhoai":{"workbenchNamespace":"rhods-notebooks"}},"dependencies":{},"dsc":{"managementState":null,"workbenchNamespace":null,"workbenchesV2":{"managementState":null}}}` | Workbenches component |
 | components.workbenches.defaults | object | `{"odh":{"workbenchNamespace":"opendatahub"},"rhoai":{"workbenchNamespace":"rhods-notebooks"}}` | Operator-type-specific defaults for dsc fields |
 | components.workbenches.dependencies | object | `{}` | Dependencies required by Workbenches |
-| components.workbenches.dsc | object | `{"managementState":null,"workbenchNamespace":null}` | DSC configuration for Workbenches |
+| components.workbenches.dsc | object | `{"managementState":null,"workbenchNamespace":null,"workbenchesV2":{"managementState":null}}` | DSC configuration for Workbenches |
 | components.workbenches.dsc.managementState | string | `nil` | Management state for Workbenches. Null uses profile default. |
 | components.workbenches.dsc.workbenchNamespace | string | `nil` | Workbench namespace for Workbenches (overrides defaults) |
+| components.workbenches.dsc.workbenchesV2 | object | `{"managementState":null}` | Workbenches V2 (new in DSC v3) |
+| components.workbenches.dsc.workbenchesV2.managementState | string | `nil` | Management state for Workbenches V2 (Managed or Removed). Null uses profile default. |
+| dependencies.agentSandbox | object | `{"dependencies":{},"enabled":"auto","olm":{"channel":"preview-0.9","name":"agent-sandbox-operator","namespace":"agent-sandbox-system"}}` | Agent Sandbox operator (Red Hat build of Agent Sandbox) |
+| dependencies.agentSandbox.dependencies | object | `{}` | Dependencies required by agent-sandbox |
+| dependencies.agentSandbox.enabled | string | `"auto"` | Enable agent-sandbox: auto (if needed), true (always), false (never) |
 | dependencies.certManager | object | `{"dependencies":{},"enabled":"auto","olm":{"channel":"stable-v1","name":"openshift-cert-manager-operator","namespace":"cert-manager-operator"}}` | Cert Manager operator |
 | dependencies.certManager.dependencies | object | `{}` | Dependencies required by cert-manager |
 | dependencies.certManager.enabled | string | `"auto"` | Enable cert-manager: auto (if needed), true (always), false (never) |
-| dependencies.clusterObservability | object | `{"dependencies":{"opentelemetry":true},"enabled":"auto","olm":{"channel":"stable","name":"cluster-observability-operator","namespace":"openshift-cluster-observability-operator"}}` | Cluster Observability operator |
+| dependencies.clusterObservability | object | `{"dependencies":{"opentelemetry":true},"enabled":"auto","olm":{"channel":"stable","name":"cluster-observability-operator","namespace":"openshift-cluster-observability-operator","operatorGroupName":"openshift-cluster-observability-operator"}}` | Cluster Observability operator |
 | dependencies.clusterObservability.dependencies | object | `{"opentelemetry":true}` | Dependencies required by cluster-observability |
 | dependencies.clusterObservability.enabled | string | `"auto"` | Enable cluster-observability: auto (if needed), true (always), false (never) |
+| dependencies.clusterObservability.olm.operatorGroupName | string | `"openshift-cluster-observability-operator"` | OperatorGroup name, matching the RHACM observability addon in the shared namespace. |
 | dependencies.customMetricsAutoscaler | object | `{"dependencies":{},"enabled":"auto","olm":{"channel":"stable","name":"openshift-custom-metrics-autoscaler-operator","namespace":"openshift-keda"}}` | Custom Metrics Autoscaler (KEDA) operator |
 | dependencies.customMetricsAutoscaler.dependencies | object | `{}` | Dependencies required by custom-metrics-autoscaler |
 | dependencies.customMetricsAutoscaler.enabled | string | `"auto"` | Enable custom-metrics-autoscaler: auto (if needed), true (always), false (never) |
@@ -138,19 +158,29 @@ A Helm chart for installing ODH/RHOAI dependencies and component configurations
 | dependencies.tempo | object | `{"dependencies":{"opentelemetry":true},"enabled":"auto","olm":{"channel":"stable","name":"tempo-product","namespace":"openshift-tempo-operator"}}` | Tempo operator |
 | dependencies.tempo.dependencies | object | `{"opentelemetry":true}` | Dependencies required by tempo |
 | dependencies.tempo.enabled | string | `"auto"` | Enable tempo: auto (if needed), true (always), false (never) |
+| global | object | `{"relatedImages":[]}` | Values shared by the optional AI Grid subcharts. |
+| global.relatedImages | list | `[]` | Full image references using the XKS name/value convention. See README.md for supported names. |
+| grid-enrollment | object | `{"enabled":true,"fullnameOverride":"grid-enrollment"}` | AI Grid enrollment service |
+| grid-enrollment.enabled | bool | `true` | Include enrollment when AIGateway and aiGrid are Managed. False uses an externally managed service. |
+| grid-enrollment.fullnameOverride | string | `"grid-enrollment"` | Stable resource names, independent of the release name |
 | labels | object | `{}` | Common labels applied to all resources |
 | olm.installPlanApproval | string | `"Automatic"` | Install plan approval mode (Automatic or Manual) |
 | olm.source | string | `"redhat-operators"` | Default catalog source for OLM subscriptions |
 | olm.sourceNamespace | string | `"openshift-marketplace"` | Namespace of the catalog source |
 | operator.enabled | bool | `true` | Enable operator installation |
-| operator.odh | object | `{"applicationsNamespace":"opendatahub","monitoringNamespace":"opendatahub","olm":{"channel":"fast-3","name":"opendatahub-operator","namespace":"opendatahub-operator-system","source":"community-operators"}}` | ODH operator settings |
-| operator.rhoai | object | `{"applicationsNamespace":"redhat-ods-applications","monitoringNamespace":"redhat-ods-monitoring","olm":{"channel":"beta","name":"rhods-operator","namespace":"redhat-ods-operator","source":"redhat-operators"}}` | RHOAI operator settings |
+| operator.odh | object | `{"applicationsNamespace":"opendatahub","monitoringNamespace":"opendatahub","olm":{"channel":"fast-3","createNamespace":true,"name":"opendatahub-operator","namespace":"opendatahub-operator-system","source":"community-operators"}}` | ODH operator settings |
+| operator.rhoai | object | `{"applicationsNamespace":"redhat-ods-applications","monitoringNamespace":"redhat-ods-monitoring","olm":{"channel":"beta","createNamespace":true,"name":"rhods-operator","namespace":"redhat-ods-operator","source":"redhat-operators"}}` | RHOAI operator settings |
 | operator.type | string | `"odh"` | Operator type: odh (Open Data Hub) or rhoai (Red Hat OpenShift AI) |
-| profile | string | `"default"` | Deploy profile: sets default managementState for components and services. Options: default (all Removed), rhaii (KServe for inference/model serving) Explicit managementState values override the profile. |
-| services.monitoring | object | `{"dependencies":{"certManager":true,"clusterObservability":true,"loki":true,"opentelemetry":true,"tempo":true},"dsci":{"alerting":{},"managementState":null,"metrics":{},"traces":{}}}` | Monitoring service configuration |
+| praxis-gateway | object | `{"enabled":true,"fullnameOverride":"grid-gateway","image":{"flavor":"grid-gateway","repository":"ghcr.io/praxis-proxy/grid-gateway","tag":"v0.2.2"}}` | AI Grid gateway (Praxis) |
+| praxis-gateway.enabled | bool | `true` | Include the gateway when AIGateway and aiGrid are Managed. False uses an externally managed gateway. |
+| praxis-gateway.fullnameOverride | string | `"grid-gateway"` | Stable resource names, independent of the release name |
+| praxis-gateway.image.repository | string | `"ghcr.io/praxis-proxy/grid-gateway"` | Use the Grid gateway build, which includes Grid routing filters. |
+| profile | string | `"default"` | Deploy profile: sets default managementState for components and services. Options: default (all Removed), rhaii (inference), maas, ai-grid (Grid operator and CRDs) Explicit managementState values override the profile. |
+| services.monitoring | object | `{"dependencies":{"certManager":true,"clusterObservability":true,"loki":true,"opentelemetry":true,"tempo":true},"dsci":{"alerting":{},"logs":{},"managementState":null,"metrics":{},"traces":{},"usageLogs":{}}}` | Monitoring service configuration |
 | services.monitoring.dsci.managementState | string | `nil` | Management state for monitoring. Null uses profile default or Removed. |
 | skipCrdCheck | bool | `false` | Skip CRD existence check - render all CRs regardless. Set to true for ArgoCD. |
 | tags.install-with-helm-dependencies | bool | `false` | Install operators using Helm chart dependencies instead of OLM. Set to true when OLM is not available in the cluster. Default is false (use OLM Subscriptions when available). |
 | trustedCABundle | object | `{"customCABundle":"","managementState":"Managed"}` | Trusted CA bundle configuration |
 | trustedCABundle.customCABundle | string | `""` | A custom CA bundle that will be available for all components in the Data Science Cluster (DSC). |
 | trustedCABundle.managementState | string | `"Managed"` | Management state for trusted CA bundle (Managed or Removed) |
+

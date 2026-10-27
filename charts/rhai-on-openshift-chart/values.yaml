@@ -11,9 +11,14 @@ tags:
 skipCrdCheck: false
 
 # -- Deploy profile: sets default managementState for components and services.
-# Options: default (all Removed), rhaii (KServe for inference/model serving)
+# Options: default (all Removed), rhaii (inference), maas, ai-grid (Grid operator and CRDs)
 # Explicit managementState values override the profile.
 profile: default
+
+# -- Values shared by the optional AI Grid subcharts.
+global:
+  # -- Full image references using the XKS name/value convention. See README.md for supported names.
+  relatedImages: []
 
 # =============================================================================
 # OLM - Settings for OLM operator subscriptions
@@ -46,6 +51,7 @@ operator:
 
     olm:
       channel: fast-3
+      createNamespace: true
       name: opendatahub-operator
       namespace: opendatahub-operator-system
       source: community-operators
@@ -63,6 +69,7 @@ operator:
 
     olm:
       channel: beta
+      createNamespace: true
       name: rhods-operator
       namespace: redhat-ods-operator
       source: redhat-operators
@@ -92,6 +99,8 @@ services:
       metrics: {}
       traces: {}
       alerting: {}
+      logs: {}
+      usageLogs: {}
 
 # =============================================================================
 # COMPONENTS - High-level features that auto-enable their dependencies
@@ -104,7 +113,7 @@ services:
 #   defaults: (optional) Operator-type-specific defaults for dsc fields
 # =============================================================================
 components:
-  # -- AI Gateway component (manages MaaS and BatchGateway sub-components)
+  # -- AI Gateway component (manages MaaS, BatchGateway, and AI Grid sub-components)
   aigateway:
     dependencies:
       certManager:
@@ -120,6 +129,10 @@ components:
         managementState:
       batchGateway:
         managementState:
+      # AI Grid sub-component (Grid operator and CRDs). Omitted from the DSC unless set,
+      # since operators without the field reject it.
+      # aiGrid:
+      #   managementState: Removed
     # -- Gateway and GatewayClass resources for MaaS (created independently of DSC)
     modelsAsAService:
       # -- GatewayClass configuration for the LLMInferenceService.
@@ -180,26 +193,35 @@ components:
       # argoWorkflowsControllers:
       #   managementState: Managed
 
-  # -- Dashboard component
+  # -- Dashboard component (structural in DSC v3: no component-level managementState; the core Dashboard and the MaaS Consumer Portal are managed independently)
   dashboard:
     # -- Dependencies required by Dashboard
     dependencies: {}
+    # -- DSC configuration for Dashboard
     dsc:
-      # -- Management state for Dashboard. Null uses profile default.
-      managementState:
-      # -- MaaS Consumer Portal sub-component
-      maasConsumerPortal:
-        # -- Management state for MaaS Consumer Portal. Null uses profile default.
+      standard:
+        # -- Management state for the core Dashboard. Null uses profile default.
+        managementState:
+      maasPortal:
+        # -- Management state for the MaaS Consumer Portal. Null uses profile default.
+        managementState:
+      # -- MaaS Portal sub-component
+      maasPortal:
+        # -- Management state for MaaS Portal. Null uses profile default.
         managementState:
 
-  # -- Feast Operator component
-  feastoperator:
-    # -- Dependencies required by Feast Operator
+  # -- Data component (structural in DSC v3: no component-level managementState). Replaces feastoperator (featureStore) from DSC v2; dataRegistry is new in v3.
+  data:
+    # -- Dependencies required by Data
     dependencies: {}
-    # -- DSC configuration for Feast Operator
+    # -- DSC configuration for Data
     dsc:
-      # -- Management state for Feast Operator. Null uses profile default.
-      managementState:
+      featureStore:
+        # -- Management state for Feature Store. Null uses profile default.
+        managementState:
+      dataRegistry:
+        # -- Management state for Data Registry. Null uses profile default.
+        managementState:
 
   # -- KServe model serving component
   kserve:
@@ -221,10 +243,9 @@ components:
         managementState:
       # -- Raw deployment service config for KServe (Headless or Headed)
       rawDeploymentServiceConfig: Headless
-      # -- Enables llm-d Workload Variant Autoscaler
-      # -- Note: When run on Openshift, and set to Managed ensure Custom Metrics Autoscaler (CMA) or Prometheus Adapter is installed
-      wva:
-        # -- Management state for workload-variant-autoscaler. Null uses profile default.
+      # -- Enables ModelExpress, a model cache and GPU-to-GPU weight transfer service for distributed model serving (Tech Preview)
+      modelExpress:
+        # -- Management state for ModelExpress. Null uses profile default.
         managementState:
     # -- GatewayClass configuration for KServe inference
     gatewayClass:
@@ -285,22 +306,26 @@ components:
       defaultLocalQueueName: default
       defaultClusterQueueName: default
 
-  # -- Model Registry component
-  modelregistry:
-    # -- Dependencies required by Model Registry
+  # -- AI Hub component (Model Registry; replaces modelregistry from DSC v2)
+  aiHub:
+    # -- Dependencies required by AI Hub
     dependencies: {}
-    # -- DSC configuration for Model Registry
+    # -- DSC configuration for AI Hub
     dsc:
-      # -- Management state for Model Registry. Null uses profile default.
+      # -- Management state for AI Hub. Null uses profile default.
       managementState:
-      # -- Registries namespace for Model Registry (overrides defaults)
-      registriesNamespace:
+      # -- Namespace for model registry instances (overrides defaults). Immutable in the operator while managementState is Managed.
+      instancesNamespace:
+    # NOTE: the aiHub chart defaults must stay in sync with
+    # rhoai-dependencies.aiHubChartDefaultInstancesNamespaces in
+    # templates/definitions/_helpers.tpl (migration conflict detection).
+
     # -- Operator-type-specific defaults for dsc fields
     defaults:
       odh:
-        registriesNamespace: odh-model-registry
+        instancesNamespace: odh-model-registry
       rhoai:
-        registriesNamespace: rhoai-model-registries
+        instancesNamespace: rhoai-model-registries
 
   # -- Ray component
   ray:
@@ -323,13 +348,13 @@ components:
       # -- Management state for Trainer. Null uses profile default.
       managementState:
 
-  # -- Kubeflow Training Operator component
-  trainingoperator:
-    # -- Dependencies required by Kubeflow Training Operator
+  # -- MCP Lifecycle Operator component (new in DSC v3)
+  mcplifecycleoperator:
+    # -- Dependencies required by MCP Lifecycle Operator
     dependencies: {}
-    # -- DSC configuration for Kubeflow Training Operator
+    # -- DSC configuration for MCP Lifecycle Operator
     dsc:
-      # -- Management state for Kubeflow Training Operator. Null uses profile default.
+      # -- Management state for MCP Lifecycle Operator. Null uses profile default.
       managementState:
 
   # -- TrustyAI component
@@ -356,6 +381,10 @@ components:
       managementState:
       # -- Workbench namespace for Workbenches (overrides defaults)
       workbenchNamespace:
+      # -- Workbenches V2 (new in DSC v3)
+      workbenchesV2:
+        # -- Management state for Workbenches V2 (Managed or Removed). Null uses profile default.
+        managementState:
     # -- Operator-type-specific defaults for dsc fields
     defaults:
       odh:
@@ -392,6 +421,28 @@ components:
       # -- Management state for Spark Operator (Managed or Removed)
       managementState: Removed
 
+  # DEPRECATED keys removed in DSC v3 (setting them fails validation):
+  #   modelregistry    -> components.aiHub (dsc.registriesNamespace -> dsc.instancesNamespace)
+  #   feastoperator    -> components.data.dsc.featureStore
+  #   trainingoperator -> removed in DSC v3 (use components.trainer)
+  #   kserve.dsc.wva   -> removed in DSC v3 (the operator treats WVA as always Removed)
+  # Old DSC v2 shapes, for reference only (DO NOT uncomment):
+  #   modelregistry:
+  #     dsc:
+  #       managementState: Managed
+  #       registriesNamespace: my-namespace
+  #   feastoperator:
+  #     dsc:
+  #       managementState: Managed
+  #   trainingoperator:
+  #     dsc:
+  #       managementState: Managed
+  #   kserve:
+  #     dsc:
+  #       wva:
+  #         managementState: Managed
+  # See the README migration table for details.
+
 # =============================================================================
 # DEPENDENCIES - Operators required by components
 #
@@ -414,6 +465,17 @@ dependencies:
       channel: stable-v1
       name: openshift-cert-manager-operator
       namespace: cert-manager-operator
+
+  # -- Agent Sandbox operator (Red Hat build of Agent Sandbox)
+  agentSandbox:
+    # -- Enable agent-sandbox: auto (if needed), true (always), false (never)
+    enabled: auto
+    # -- Dependencies required by agent-sandbox
+    dependencies: {}
+    olm:
+      channel: preview-0.9
+      name: agent-sandbox-operator
+      namespace: agent-sandbox-system
 
   # -- Leader Worker Set operator
   leaderWorkerSet:
@@ -522,6 +584,8 @@ dependencies:
       channel: stable
       name: cluster-observability-operator
       namespace: openshift-cluster-observability-operator
+      # -- OperatorGroup name, matching the RHACM observability addon in the shared namespace.
+      operatorGroupName: openshift-cluster-observability-operator
 
   # -- OpenTelemetry operator
   opentelemetry:
@@ -640,3 +704,38 @@ dependencies:
     #       enabled: true
     #     nodeStatusExporter:
     #       enabled: true
+
+# =============================================================================
+# AI GRID - Managed runtime subcharts vendored from github.com/praxis-proxy/grid.
+# Values under each key pass through to the subchart; see charts/<name> in this chart.
+# =============================================================================
+# -- AI Grid enrollment service
+grid-enrollment:
+  # -- Include enrollment when AIGateway and aiGrid are Managed. False uses an externally managed service.
+  enabled: true
+  # -- Stable resource names, independent of the release name
+  fullnameOverride: grid-enrollment
+
+# -- AI Grid gateway (Praxis)
+praxis-gateway:
+  # -- Include the gateway when AIGateway and aiGrid are Managed. False uses an externally managed gateway.
+  enabled: true
+  # -- Stable resource names, independent of the release name
+  fullnameOverride: grid-gateway
+  image:
+    # -- Use the Grid gateway build, which includes Grid routing filters.
+    repository: ghcr.io/praxis-proxy/grid-gateway
+    tag: v0.2.2
+    flavor: grid-gateway
+
+# =============================================================================
+# Subcharts
+# =============================================================================
+
+# -- AI Grid observability hub subchart
+ai-grid-o11y-hub:
+  enabled: false
+
+# -- AI Grid observability spoke subchart
+ai-grid-o11y-spoke:
+  enabled: false

@@ -24,7 +24,6 @@ jobs:
           AUTHOR_LOGIN: ${{ github.event.pull_request.user.login }}
           EVENT_ACTION: ${{ github.event.action }}
           LABEL_NAME: ${{ github.event.label.name }}
-          HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'run-xks-e2e') }}
         run: |
           TRUSTED_BOTS=("github-actions[bot]" "red-hat-konflux[bot]" "jira-autofix[bot]")
 
@@ -42,15 +41,11 @@ jobs:
               exit 0
             fi
           done
-          if [[ "$EVENT_ACTION" == "labeled" && ( "$LABEL_NAME" == "lgtm" || "$LABEL_NAME" == "approved" ) ]]; then
-            echo "Reviewer approval ($LABEL_NAME) — running automatically"
+          if [[ "$EVENT_ACTION" == "labeled" && ( "$LABEL_NAME" == "lgtm" || "$LABEL_NAME" == "run-xks-e2e" ) ]]; then
+            echo "External contributor — tests authorized via '$LABEL_NAME' label for this commit"
             exit 0
           fi
-          if [[ "$HAS_LABEL" == "true" ]]; then
-            echo "External contributor — approved via 'run-xks-e2e' label"
-            exit 0
-          fi
-          echo "::error::xKS e2e tests required. A maintainer must add the 'run-xks-e2e' label after reviewing the code."
+          echo "::error::xKS e2e tests required. A trusted reviewer must add the 'lgtm' or 'run-xks-e2e' label after reviewing this commit."
           exit 1
 
   e2e-test:
@@ -62,16 +57,19 @@ jobs:
         cloud_provider: [azure, coreweave, aws]
     steps:
       - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          # Accepted risk: this job runs reviewed fork PR code with RHAI_PULL_SECRET.
+          # Authorization requires a fresh maintainer label event for the current commit.
+          allow-unsafe-pr-checkout: true
 
       - name: Setup Helm
-        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
 
       - name: Create kind cluster
-        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
+        uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
 
       - name: Build chart dependencies
         run: helm dependency build charts/rhai-on-xks-chart
@@ -116,16 +114,19 @@ jobs:
         cloud_provider: [azure, coreweave] # TODO: add aws once 3.5 GA is the starting version, as AWS is not supported in 3.4.x
     steps:
       - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          # Accepted risk: this job runs reviewed fork PR code with RHAI_PULL_SECRET.
+          # Authorization requires a fresh maintainer label event for the current commit.
+          allow-unsafe-pr-checkout: true
 
       - name: Setup Helm
-        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
 
       - name: Create kind cluster
-        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
+        uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
 
       - name: Build chart dependencies
         run: helm dependency build charts/rhai-on-xks-chart

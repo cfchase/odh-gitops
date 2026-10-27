@@ -21,11 +21,31 @@
       "default": false,
       "description": "Skip CRD existence check - render all CRs regardless. Set to true for ArgoCD or when running helm multiple times."
     },
+    "grid-enrollment": {
+      "type": "object",
+      "description": "AI Grid runtime, rendered only when AIGateway and aiGrid are Managed. See charts/grid-enrollment for its values.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "praxis-gateway": {
+      "type": "object",
+      "description": "AI Grid runtime, rendered only when AIGateway and aiGrid are Managed. See charts/praxis-gateway for its values.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
     "profile": {
       "type": "string",
-      "enum": ["default", "maas", "rhaii"],
+      "enum": ["default", "maas", "ai-grid", "rhaii"],
       "default": "default",
-      "description": "Deploy profile that sets default component managementStates. 'default' keeps all components Removed. 'maas' enables AIGateway with modelsAsAService + KServe for MaaS deployments. 'rhaii' enables only KServe for inference/model serving. Explicit managementState values override the profile."
+      "description": "Deploy profile that sets default component managementStates. 'default' keeps all components Removed. 'maas' enables AIGateway with modelsAsAService + KServe for MaaS deployments. 'ai-grid' enables AIGateway with only the aiGrid sub-component. 'rhaii' enables only KServe for inference/model serving. Explicit managementState values override the profile."
     },
     "olm": {
       "type": "object",
@@ -105,11 +125,14 @@
         "aipipelines": {
           "$ref": "#/definitions/aipipelinesComponent"
         },
+        "aiHub": {
+          "$ref": "#/definitions/aiHubComponent"
+        },
         "dashboard": {
           "$ref": "#/definitions/dashboardComponent"
         },
-        "feastoperator": {
-          "$ref": "#/definitions/component"
+        "data": {
+          "$ref": "#/definitions/dataComponent"
         },
         "aigateway": {
           "$ref": "#/definitions/aigatewayComponent"
@@ -123,16 +146,22 @@
         "mlflowoperator": {
           "$ref": "#/definitions/component"
         },
+        "mcplifecycleoperator": {
+          "$ref": "#/definitions/component"
+        },
         "modelregistry": {
           "$ref": "#/definitions/modelregistryComponent"
+        },
+        "feastoperator": {
+          "$ref": "#/definitions/deprecatedComponent"
+        },
+        "trainingoperator": {
+          "$ref": "#/definitions/deprecatedComponent"
         },
         "ray": {
           "$ref": "#/definitions/component"
         },
         "trainer": {
-          "$ref": "#/definitions/component"
-        },
-        "trainingoperator": {
           "$ref": "#/definitions/component"
         },
         "trustyai": {
@@ -177,6 +206,9 @@
         "certManager": {
           "$ref": "#/definitions/dependency"
         },
+        "agentSandbox": {
+          "$ref": "#/definitions/dependency"
+        },
         "leaderWorkerSet": {
           "$ref": "#/definitions/dependencyWithConfig"
         },
@@ -212,6 +244,44 @@
         }
       },
       "additionalProperties": false
+    },
+    "global": {
+      "type": "object",
+      "properties": {
+        "relatedImages": {
+          "type": "array",
+          "description": "Full image overrides shared by AI Grid subcharts (name/value entries).",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "value"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "value": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ai-grid-o11y-hub": {
+      "type": "object",
+      "description": "Values for the ai-grid-o11y-hub subchart. Schema is intentionally permissive; see the subchart's own values for available options.",
+      "additionalProperties": true
+    },
+    "ai-grid-o11y-spoke": {
+      "type": "object",
+      "description": "Values for the ai-grid-o11y-spoke subchart. Schema is intentionally permissive; see the subchart's own values for available options.",
+      "additionalProperties": true
     }
   },
   "definitions": {
@@ -255,6 +325,10 @@
             "namespace": {
               "type": "string",
               "description": "Namespace where the operator will be installed"
+            },
+            "createNamespace": {
+              "type": "boolean",
+              "description": "Whether Helm should create the operator namespace. Set to false if the namespace already exists."
             },
             "source": {
               "type": "string",
@@ -470,7 +544,7 @@
             "managementState": {
               "$ref": "#/definitions/defaultManagementState"
             },
-            "maasConsumerPortal": {
+            "maasPortal": {
               "type": "object",
               "description": "MaaS Consumer Portal sub-component",
               "properties": {
@@ -564,7 +638,17 @@
             },
             "wva": {
               "type": "object",
-              "description": "Workload Variant Autoscaler configuration for KServe",
+              "description": "DEPRECATED (DSC v2): removed in DSC v3. The operator treats the llm-d Workload Variant Autoscaler as always Removed. Setting a managementState here fails the render.",
+              "properties": {
+                "managementState": {
+                  "$ref": "#/definitions/defaultManagementState"
+                }
+              },
+              "additionalProperties": false
+            },
+            "modelExpress": {
+              "type": "object",
+              "description": "ModelExpress configuration for KServe",
               "properties": {
                 "managementState": {
                   "$ref": "#/definitions/defaultManagementState"
@@ -618,6 +702,16 @@
                 }
               },
               "additionalProperties": false
+            },
+            "aiGrid": {
+              "type": "object",
+              "description": "AI Grid sub-component",
+              "properties": {
+                "managementState": {
+                  "$ref": "#/definitions/defaultManagementState"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -639,23 +733,159 @@
       "required": ["dsc"],
       "additionalProperties": false
     },
-    "modelregistryComponent": {
+    "deprecatedComponent": {
       "type": "object",
-      "description": "Model Registry component configuration with operator-type defaults.",
+      "description": "DEPRECATED (DSC v2) component with no DSC v3 equivalent. Setting any field here fails the render with a migration hint. Unlike live components, no field is required: partial blocks from old values files must reach the template-level validation, not be rejected by the schema.",
       "properties": {
         "dependencies": {
           "$ref": "#/definitions/componentDeps"
         },
         "dsc": {
           "type": "object",
-          "description": "DSC configuration for Model Registry",
+          "description": "DSC configuration (deprecated)",
+          "properties": {
+            "managementState": {
+              "$ref": "#/definitions/defaultManagementState"
+            }
+          },
+          "additionalProperties": false
+        },
+        "defaults": {
+          "$ref": "#/definitions/operatorTypeDefaults"
+        }
+      },
+      "additionalProperties": false
+    },
+    "modelregistryComponent": {
+      "type": "object",
+      "description": "DEPRECATED (DSC v2): use components.aiHub instead. Translated automatically (dsc.registriesNamespace -> aiHub.dsc.instancesNamespace) and removed in a future release. No field is required: partial blocks from old values files must reach the template-level validation.",
+      "properties": {
+        "dependencies": {
+          "$ref": "#/definitions/componentDeps"
+        },
+        "dsc": {
+          "type": "object",
+          "description": "DSC configuration for Model Registry (deprecated)",
           "properties": {
             "managementState": {
               "$ref": "#/definitions/defaultManagementState"
             },
             "registriesNamespace": {
               "type": ["string", "null"],
-              "description": "Namespace for model registries. Overrides defaults if set."
+              "description": "DEPRECATED: use components.aiHub.dsc.instancesNamespace. Overrides defaults if set."
+            }
+          },
+          "additionalProperties": false
+        },
+        "defaults": {
+          "$ref": "#/definitions/operatorTypeDefaults"
+        }
+      },
+      "additionalProperties": false
+    },
+    "aiHubComponent": {
+      "type": "object",
+      "description": "AI Hub component configuration (Model Registry; replaces modelregistry from DSC v2).",
+      "properties": {
+        "dependencies": {
+          "$ref": "#/definitions/componentDeps"
+        },
+        "dsc": {
+          "type": "object",
+          "description": "DSC configuration for AI Hub",
+          "properties": {
+            "managementState": {
+              "$ref": "#/definitions/defaultManagementState"
+            },
+            "instancesNamespace": {
+              "type": ["string", "null"],
+              "description": "Namespace for model registry instances. Overrides defaults if set. Immutable in the operator while managementState is Managed."
+            }
+          },
+          "additionalProperties": false
+        },
+        "defaults": {
+          "$ref": "#/definitions/operatorTypeDefaults"
+        }
+      },
+      "required": ["dsc"],
+      "additionalProperties": false
+    },
+    "dashboardComponent": {
+      "type": "object",
+      "description": "Dashboard component configuration (structural in DSC v3: the core Dashboard and the MaaS Consumer Portal are managed independently, no component-level managementState).",
+      "properties": {
+        "dependencies": {
+          "$ref": "#/definitions/componentDeps"
+        },
+        "dsc": {
+          "type": "object",
+          "description": "DSC configuration for Dashboard",
+          "properties": {
+            "managementState": {
+              "$ref": "#/definitions/defaultManagementState",
+              "description": "DEPRECATED (DSC v2 flat key): translated to dsc.standard.managementState. Mutually exclusive with the structural children."
+            },
+            "standard": {
+              "type": "object",
+              "description": "Core Dashboard configuration",
+              "properties": {
+                "managementState": {
+                  "$ref": "#/definitions/defaultManagementState"
+                }
+              },
+              "additionalProperties": false
+            },
+            "maasPortal": {
+              "type": "object",
+              "description": "MaaS Consumer Portal configuration",
+              "properties": {
+                "managementState": {
+                  "$ref": "#/definitions/defaultManagementState"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "defaults": {
+          "$ref": "#/definitions/operatorTypeDefaults"
+        }
+      },
+      "required": ["dsc"],
+      "additionalProperties": false
+    },
+    "dataComponent": {
+      "type": "object",
+      "description": "Data component configuration (structural in DSC v3: Feature Store and Data Registry are managed independently, no component-level managementState). Replaces feastoperator from DSC v2.",
+      "properties": {
+        "dependencies": {
+          "$ref": "#/definitions/componentDeps"
+        },
+        "dsc": {
+          "type": "object",
+          "description": "DSC configuration for Data",
+          "properties": {
+            "featureStore": {
+              "type": "object",
+              "description": "Feature Store configuration",
+              "properties": {
+                "managementState": {
+                  "$ref": "#/definitions/defaultManagementState"
+                }
+              },
+              "additionalProperties": false
+            },
+            "dataRegistry": {
+              "type": "object",
+              "description": "Data Registry configuration",
+              "properties": {
+                "managementState": {
+                  "$ref": "#/definitions/defaultManagementState"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -684,6 +914,16 @@
             "workbenchNamespace": {
               "type": ["string", "null"],
               "description": "Namespace for workbenches. Overrides defaults if set."
+            },
+            "workbenchesV2": {
+              "type": "object",
+              "description": "Workbenches V2 configuration (new in DSC v3)",
+              "properties": {
+                "managementState": {
+                  "$ref": "#/definitions/defaultManagementState"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -854,6 +1094,14 @@
         "alerting": {
           "type": "object",
           "description": "Alerting configuration"
+        },
+        "logs": {
+          "type": "object",
+          "description": "Logs configuration"
+        },
+        "usageLogs": {
+          "type": "object",
+          "description": "Usage logs configuration"
         },
         "collectorReplicas": {
           "type": "integer",

@@ -32,6 +32,15 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
+Indent command content under a YAML block scalar without adding spaces to
+blank lines.
+*/}}
+{{- define "rhai-on-xks-chart.indentBlock" -}}
+{{- $indented := nindent 14 (trim .) -}}
+{{- regexReplaceAll "\n[ \t]+\n" $indented "\n\n" -}}
+{{- end -}}
+
+{{/*
 Check if imagePullSecret is enabled (dockerConfigJson is provided).
 */}}
 {{- define "rhai-on-xks-chart.imagePullSecretEnabled" -}}
@@ -49,13 +58,13 @@ Return the imagePullSecret name.
 
 {{/*
 Render a dockerconfigjson Secret for a given namespace.
-Pass a dict with "root" (top-level context), "namespace", and optional "annotations" (dict).
+Pass a dict with "root" (top-level context), "namespace", and optional "name" (string) and "annotations" (dict).
 */}}
 {{- define "rhai-on-xks-chart.imagePullSecretResource" -}}
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ include "rhai-on-xks-chart.imagePullSecretName" .root }}
+  name: {{ .name | default (include "rhai-on-xks-chart.imagePullSecretName" .root) }}
   namespace: {{ .namespace }}
   labels:
     {{- include "rhai-on-xks-chart.labels" .root | nindent 4 }}
@@ -101,6 +110,7 @@ allowedRoutes:
 Collect dependency namespaces from enabled providers.
 Pass a dict with "root" (top-level context) and optional "managedOnly" (bool).
 When managedOnly is true, only dependencies with managementPolicy: Managed are included.
+RHCL's chart defaults match the Cloud Manager defaults and can be overridden.
 Returns a JSON object with key "items" containing unique namespace strings.
 Usage:
   (include "rhai-on-xks-chart.kubernetesEngineDependencyNamespaces" (dict "root" . "managedOnly" true) | fromJson).items
@@ -113,8 +123,14 @@ Usage:
   {{- $provVals := index $.root.Values (index $provider "name") | default dict }}
   {{- range $depName, $dep := (dig "kubernetesEngine" "spec" "dependencies" (dict) $provVals) }}
     {{- if or (not $managedOnly) (eq (dig "managementPolicy" "" $dep) "Managed") }}
-      {{- with (dig "configuration" "namespace" "" $dep) }}
-        {{- $namespaces = append $namespaces . }}
+      {{- $config := dig "configuration" (dict) $dep }}
+      {{- if eq $depName "rhcl" }}
+        {{- $namespaces = append $namespaces $config.operatorNamespace }}
+        {{- $namespaces = append $namespaces $config.operandNamespace }}
+      {{- else }}
+        {{- with (index $config "namespace") }}
+          {{- $namespaces = append $namespaces . }}
+        {{- end }}
       {{- end }}
     {{- end }}
   {{- end }}
@@ -128,6 +144,29 @@ Return "true" when MaaS (modelsAsAService) is enabled and Managed.
 {{- define "rhai-on-xks-chart.maasManaged" -}}
 {{- if and .Values.components.aigateway.enabled (eq (dig "spec" "modelsAsAService" "managementState" "" .Values.components.aigateway) "Managed") -}}
 true
+{{- end -}}
+{{- end -}}
+
+{{/*
+Return "true" when AI Grid is enabled and Managed.
+*/}}
+{{- define "rhai-on-xks-chart.aiGridManaged" -}}
+{{- if and .Values.components.aigateway.enabled (eq (dig "spec" "aiGrid" "managementState" "" .Values.components.aigateway) "Managed") -}}
+true
+{{- end -}}
+{{- end -}}
+
+{{/*
+Return the namespace used by the AI Grid operator.
+*/}}
+{{- define "rhai-on-xks-chart.aiGridNamespace" -}}
+{{- $appNs := .Values.rhaiOperator.applicationsNamespace -}}
+{{- if eq $appNs "redhat-ods-applications" -}}
+redhat-ai-grid
+{{- else if eq $appNs "opendatahub" -}}
+odh-ai-grid
+{{- else -}}
+{{- printf "%s-ai-grid" $appNs | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 {{- end -}}
 

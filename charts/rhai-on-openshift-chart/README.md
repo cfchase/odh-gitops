@@ -8,6 +8,7 @@ This chart provides a flexible way to install the operators and configurations r
 
 - **Deploy profiles**: Preconfigured deployment types (e.g., `rhaii`) that enable the right components and dependencies with a single flag
 - **Component-based installation**: Enable high-level components (kserve, kueue, aipipelines, ...) and their dependencies are automatically installed
+- **DSC v3 rendering**: The chart renders `datasciencecluster.opendatahub.io/v3` (requires ODH/RHOAI operator 3.6+); DSC v2 values keys are translated automatically, and ambiguous or removed input fails the render with an actionable message (see [Upgrading from DSC v2 values](#upgrading-from-dsc-v2-values))
 - **Tri-state dependency management**: Dependencies can be `auto` (install if needed), `true` (always install), or `false` (skip - user has it already)
 - **OLM installation**: Operators are installed via Operator Lifecycle Manager (OLM)
 - **Idempotent installation**: Run the same command multiple times until all resources are applied
@@ -194,8 +195,102 @@ Profiles provide preconfigured deployment types that set the right `managementSt
 |---------|-------------|--------------------|-----------------------------|
 | `default` | All components Removed (manual configuration) | None | None |
 | `rhaii` | RHAII inference/model-serving stack | kserve | certManager, leaderWorkerSet, rhcl |
+| `maas` | Models as a Service platform | aigateway (with `modelsAsAService`), kserve | certManager, rhcl |
+| `ai-grid` | AI Grid multi-cluster routing | aigateway (aiGrid) | None |
+
+With ordinary chart defaults, the `maas` profile installs `certManager` and `rhcl` (through `kserve`) but not
+`leaderWorkerSet` — `aigateway`'s `null` dependency default for it is not activated. Enable it explicitly
+with `--set components.aigateway.dependencies.leaderWorkerSet=true`. The profile also requires Gateway
+listener configuration for both `aigateway` and `kserve` before it renders — see
+[Enable Models as Service](#enable-models-as-service) and [KServe Gateway](#kserve-gateway).
 
 Profiles are defined as YAML files in the [`profiles/`](profiles/) directory. See the [Contributing guide](../../CONTRIBUTING.md#adding-a-new-deploy-profile) for how to add new profiles.
+
+### AI Grid
+
+AI Grid is opt-in. The default profile leaves it disabled and omits `aiGrid` for compatibility
+with payloads that do not yet expose the field. `--set profile=ai-grid` explicitly sets AIGateway
+and its `aiGrid` sub-component to `Managed`; other sub-components remain `Removed`.
+An explicit `components.aigateway.dsc.aiGrid.managementState=Removed` overrides the profile.
+
+The AI Gateway operator owns the Grid operator and its CRDs (ai-gateway-operator PR #148).
+This chart does not install a second Grid operator. The profile requires an operator payload
+containing opendatahub-operator PR #4186; chart version `3.6.0` alone does not guarantee that payload.
+
+The profile also enables the Helm-managed gateway and enrollment workloads. Both runtime
+`enabled` flags default to `true`, but resources render only when the effective AIGateway
+and `aiGrid` management states are both `Managed`. Thus the default profile installs neither.
+Setting either state to `Removed` suppresses both runtimes on the next Helm upgrade or GitOps
+sync with pruning enabled, even if their `enabled` flags remain `true`. Editing the live DSC
+alone does not update a Helm release.
+Set an individual runtime's `enabled: false` to supply that service externally.
+
+Use [`values-ai-grid-hub.yaml`](../../docs/examples/values-ai-grid-hub.yaml) to configure a
+hub's hostname, gateway ConfigMap and database Secret. The profile defaults render the upstream
+gateway status endpoint and built-in enrollment database; configure routing before using it
+for inference. Use a database provisioned for enrollment; do not point it at the MaaS database
+without a separate database/schema arrangement. Removal does not delete externally supplied
+ConfigMaps, Secrets or databases, or resources retained by upstream Helm hooks/retention policies.
+
+The gateway/enrollment charts are version `0.2.0`, vendored from `praxis-proxy/grid@3359afdcddda926f3cdf986f5173f12b30b40aae`.
+The parent defaults to the Grid gateway image, rather than the generic Praxis AI image.
+Refresh with `make update-ai-grid-charts GRID_REF=<tag-or-sha>`; this reapplies the downstream
+image/review patches and runtime template adapter, updates the dependency lock, and regenerates
+docs and snapshots. The adapter exports named resource templates so the parent can gate rendering
+using its resolved DSC state. Standalone subchart installs still render directly. This avoids
+relying on Helm dependency conditions to evaluate profile templates.
+
+Downstream builds can inject full image references through `global.relatedImages`, using the
+same `name`/`value` convention as the XKS chart. These overrides take precedence over subchart
+image repository/tag/digest settings and apply to both containers and bootstrap/invite Jobs.
+
+| Name | Image |
+|------|-------|
+| `RELATED_IMAGE_ODH_PRAXIS_AI_GRID_GATEWAY_IMAGE` | Grid gateway |
+| `RELATED_IMAGE_ODH_PRAXIS_AI_GRID_ENROLLMENT_IMAGE` | Enrollment service and Jobs |
+| `RELATED_IMAGE_ODH_PRAXIS_AI_GRID_POSTGRES_IMAGE` | Optional built-in PostgreSQL and database initialization |
+| `RELATED_IMAGE_ODH_PRAXIS_AI_GRID_OVERLAY_SYNC_IMAGE` | Optional gateway overlay-sync containers |
+
+```yaml
+global:
+  relatedImages:
+    - name: RELATED_IMAGE_ODH_PRAXIS_AI_GRID_GATEWAY_IMAGE
+      value: registry.example.com/rhai/grid-gateway@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+```
+
+The parent pins gateway, enrollment, PostgreSQL and Helm test images by digest. When
+changing an image repository/tag, also replace its digest (or use `global.relatedImages`).
+Downstream payloads should provide digest-qualified related images, including enrollment,
+whose image also runs the CA bootstrap Job. Subchart standalone image settings retain the
+upstream defaults; the parent supplies the release pins.
+
+Gateway, enrollment, bootstrap, invite and database containers have CPU/memory budgets.
+These are starting limits; size them for your workload. PostgreSQL uses a read-only root
+with writable home, temporary and socket directories plus its data PVC.
+
+Ingress policies are enabled by default. Gateway clients in the release namespace must
+have `grid.opendatahub.io/gateway-client: "true"`; the default also admits OpenShift router
+namespaces labelled `network.openshift.io/policy-group: ingress`. Replace
+`praxis-gateway.networkPolicy.from` with the actual inference clients for your topology.
+Enrollment admits its invite Job, and router namespaces when its Route is enabled;
+add direct clients under `grid-enrollment.networkPolicy.from`. Built-in PostgreSQL admits
+only this release's enrollment pods. A NetworkPolicy-capable CNI is required; node probes
+are not blocked. Direct LoadBalancer deployments must configure their permitted sources.
+
+Invite Jobs require Kubernetes ValidatingAdmissionPolicy support (GA in Kubernetes 1.30).
+Their admission policy limits writes to configured Opaque invite Secrets and rejects
+ServiceAccount-token annotations, independently of optional ACM delivery policies.
+
+For an inline or external gateway config, a Route requires `route.externalTls: true` to
+attest that its listener actually serves TLS. Generated configs retain their TLS validation.
+Explicit HTTP telemetry endpoints require `gatewayConfig.telemetry.allowInsecure: true`;
+use this only for a trusted local collector, without credentials. Environment-supplied
+exporter settings must follow the same transport policy. The Helm test checks TCP
+connectivity only; validate application responses and TLS identities with site-specific tests.
+
+The Grid operator image belongs to the platform payload. Override it through
+`operator.<odh|rhoai>.olm.config.env` with `RELATED_IMAGE_ODH_PRAXIS_AI_GRID_OPERATOR_IMAGE`
+when testing a custom payload, rather than setting a Helm-managed operator image.
 
 ### How profiles work
 
@@ -228,7 +323,7 @@ operator:
 
 | Type | Operator | Namespace | Source |
 |------|----------|-----------|--------|
-| `odh` | opendatahub-operator | openshift-operators | community-operators |
+| `odh` | opendatahub-operator | opendatahub-operator-system | community-operators |
 | `rhoai` | rhods-operator | redhat-ods-operator | redhat-operators |
 
 ### Components
@@ -246,19 +341,163 @@ High-level features that:
 
 | Component          | Description                        | Default State | Dependencies |
 |--------------------|------------------------------------|---------------|--------------|
+| `aiHub`            | AI Hub (Model Registry)            | Removed | - |
+| `aigateway`        | AI Gateway (Models as a Service)   | Removed | certManager, leaderWorkerSet, rhcl |
 | `aipipelines`      | AI Pipelines                       | Removed | - |
-| `dashboard`        | Dashboard                          | Removed | - |
-| `feastoperator`    | Feast feature store operator       | Removed | - |
+| `dashboard`        | Dashboard (structural: `standard`, `maasPortal`) | Removed | - |
+| `data`             | Data (structural: `featureStore`, `dataRegistry`) | Removed | - |
 | `kserve`           | KServe model serving               | Removed | certManager, leaderWorkerSet, jobSet, rhcl, customMetricsAutoscaler |
 | `kueue`            | Kueue job queuing                  | Removed | certManager, kueue |
-| `ogx`              | OGX                                | Removed | nfd, nvidiaGPUOperator |
+| `mcplifecycleoperator` | MCP Lifecycle Operator         | Removed | - |
 | `mlflowoperator`   | MLflow tracking and model registry | Removed | - |
-| `modelregistry`    | Model Registry                     | Removed | - |
+| `ogx`              | OGX                                | Removed | nfd, nvidiaGPUOperator |
 | `ray`              | Ray distributed computing          | Removed | certManager |
+| `sparkoperator`    | Spark Operator                     | Removed | - |
 | `trainer`          | Trainer                            | Removed | certManager, jobSet |
-| `trainingoperator` | Kubeflow Training Operator         | Removed | - |
 | `trustyai`         | TrustyAI                           | Removed | - |
-| `workbenches`      | Workbenches                        | Removed | - |
+| `workbenches`      | Workbenches (incl. `workbenchesV2`) | Removed | - |
+
+With ordinary chart defaults, `aigateway`'s `null`-defaulted dependencies are not activated when the
+component is enabled — set them to `true` explicitly to install them.
+
+#### Structural components
+
+`dashboard` and `data` are **structural** in DSC v3: they have no component-level
+`managementState`. Each child carries its own state, and the component-level
+dependencies activate when any child is Managed or Unmanaged:
+
+```yaml
+components:
+  dashboard:
+    dsc:
+      standard:
+        managementState: Managed    # core Dashboard
+      maasPortal:
+        managementState: Removed    # MaaS Consumer Portal
+  data:
+    dsc:
+      featureStore:
+        managementState: Managed    # Feature Store (replaces feastoperator)
+      dataRegistry:
+        managementState: Removed    # Data Registry
+```
+
+#### Upgrading from DSC v2 values
+
+The chart renders `datasciencecluster.opendatahub.io/v3` and requires an operator
+version that serves v3 (ODH/RHOAI 3.6+). Values files written for DSC v2 keep
+working: deprecated keys are translated automatically, and ambiguous or removed
+input fails the render with an actionable message.
+
+| Deprecated DSC v2 key | DSC v3 equivalent | Behavior |
+|-----------------------|-------------------|----------|
+| `components.modelregistry` | `components.aiHub` | Translated (`dsc.registriesNamespace` → `dsc.instancesNamespace`; dependencies and operator-type defaults carried over) |
+| `components.feastoperator` | `components.data.dsc.featureStore` | Translated |
+| `components.dashboard.dsc.managementState` | `components.dashboard.dsc.standard.managementState` | Translated |
+| `components.trainingoperator` | — | **Fails**: component removed in DSC v3; use `components.trainer` |
+| `components.kserve.dsc.wva` | — | **Fails**: removed in DSC v3; the operator treats WVA as always Removed |
+
+Rules:
+- Conflicts can extend beyond the mapped replacement — migrate your values,
+  then remove the deprecated key. Management-state and namespace values count
+  as set when non-null and non-empty; dependencies and defaults maps count
+  when non-empty, even if an entry is `false` or `null`:
+  - `components.modelregistry` conflicts with any of
+    `components.aiHub.dsc.managementState`,
+    `components.aiHub.dsc.instancesNamespace`, or
+    `components.aiHub.dependencies`.
+  - `components.feastoperator` conflicts with any of
+    `components.data.dsc.featureStore.managementState`,
+    `components.data.dsc.dataRegistry.managementState`,
+    `components.data.dependencies`, or `components.data.defaults`.
+  - The legacy `components.dashboard.dsc.managementState` conflicts only with
+    `components.dashboard.dsc.standard.managementState` or
+    `components.dashboard.dsc.maasPortal.managementState`, not dashboard
+    dependencies or defaults.
+  - `components.modelregistry.defaults.<operator-type>.registriesNamespace`
+    conflicts with
+    `components.aiHub.defaults.<operator-type>.instancesNamespace` when both
+    namespaces are non-empty for the same operator type and the aiHub value
+    differs from the chart default. If aiHub has the chart default, a
+    non-empty old namespace is carried over; without one, the aiHub value
+    remains unchanged.
+- Conflict and removed-key failures are validated when the chart renders
+  the DSC, which requires the v3 CRD — on a first install before the
+  operator serves it, invalid values surface on the next upgrade.
+- `null` never counts as set: a legacy block whose values are all `null`
+  or empty is pruned silently (no deprecation notice), `null` leaves in a
+  set block carry nothing, and a whole key set to `null` is rejected by
+  the values schema — remove the key instead.
+- Translated stanzas render with a deprecation comment, and `helm install` prints
+  a **Deprecation Notices** section — remove the old keys at your convenience.
+- Deprecated keys are removed in the next chart major; translate manually before
+  then (the table above is the complete mapping).
+- `components.aiHub.dsc.instancesNamespace` is immutable in the operator while
+  `aiHub` is `Managed`; the translation preserves your existing value across the
+  upgrade (including operator-type defaults).
+
+#### Example: upgrading a chart 3.4.x release
+
+For a release installed with chart 3.4.x (DSC v2) — e.g. with
+`components.modelregistry.dsc.registriesNamespace: odh-model-registry` — against
+a 3.6 operator:
+
+```bash
+# Set OPERATOR_TYPE to the operator type of the release you are upgrading
+# (odh | rhoai); it must match the existing install. The guard below fails
+# loudly when the variable is unset and keeps an already-set value, and the
+# validation in step 2 rejects any value other than odh or rhoai:
+: "${OPERATOR_TYPE:?set OPERATOR_TYPE to odh or rhoai, matching the existing install}"
+
+# 1. Upgrade the operator subscription to a 3.6+ channel/build first, and wait
+#    for the operator to serve the v3 CRDs (a listed version is not necessarily
+#    served — filter for the served ones):
+kubectl get crd datascienceclusters.datasciencecluster.opendatahub.io \
+  -o jsonpath='{.spec.versions[?(@.served==true)].name}'   # must list v3
+
+# 2. If your values file sets components.trainingoperator or
+#    components.kserve.dsc.wva, remove those keys first — they fail the
+#    render even when set to Removed (the migration table's Fails rows).
+#    Upgrade with the rest of your values file unchanged, repeating any
+#    --set overrides from your original install. operator.type matters
+#    most: a --set override lives only in the release, and the chart
+#    default is odh — a rhoai release upgraded without repeating it
+#    silently switches to the opendatahub operator (and its namespace
+#    defaults):
+case "${OPERATOR_TYPE}" in odh|rhoai) ;; *) echo "invalid OPERATOR_TYPE" >&2; exit 1;; esac
+helm upgrade --install "${OPERATOR_TYPE}" ./charts/rhai-on-openshift-chart \
+  -n "${OPERATOR_TYPE}-gitops" --set "operator.type=${OPERATOR_TYPE}" \
+  -f my-values.yaml
+
+# 3. Verify: the rendered DSC keeps your value (no CEL immutability conflict):
+helm get manifest "${OPERATOR_TYPE}" -n "${OPERATOR_TYPE}-gitops" | \
+  grep -A2 'aiHub:'   # instancesNamespace must equal your previous value
+```
+
+Use the release name and namespace of your existing install — the example
+follows the [Quick Start](#quick-start) convention (`${OPERATOR_TYPE}` in
+`${OPERATOR_TYPE}-gitops`); `make helm-install-verify`, for instance, installs
+the release `odh` in `opendatahub-gitops`.
+
+Expected result: `modelregistry.dsc.registriesNamespace: odh-model-registry`
+renders as `spec.components.aiHub.instancesNamespace: odh-model-registry` —
+unchanged from what the operator already owns, so the CEL immutability check
+passes and the upgrade applies cleanly.
+
+The repo also provides a repeatable install-and-verify target (requires a live
+cluster): `make helm-install-verify`.
+
+This target layers `test/values-e2e.yaml` over the component values on every Helm
+install/upgrade. It pins ODH/RHOAI related images through the operator's Subscription
+`config.env`. Override the file with `HELM_E2E_VALUES_FILE=/path/to/values.yaml`.
+
+The `Update OCP E2E Images` workflow refreshes these pins from
+`opendatahub-io/opendatahub-operator`'s `main/manifests-config.yaml` through an
+automated PR, daily or on an `operator-manifest-update` dispatch. To refresh locally:
+
+```bash
+bash charts/rhai-on-openshift-chart/scripts/update-e2e-images.sh /path/to/manifests-config.yaml
+```
 
 ### Dependencies
 
@@ -284,6 +523,12 @@ Operators that can be installed. Use tri-state `enabled` field:
 | `loki` | Loki operator | - |
 | `nfd` | Node Feature Discovery (required for GPU support) | - |
 | `nvidiaGPUOperator` | NVIDIA GPU Operator (required for GPU support) | nfd |
+
+The COO OperatorGroup defaults to `openshift-cluster-observability-operator`, matching
+the RHACM observability addon. When RHACM owns COO, set
+`dependencies.clusterObservability.enabled: false` after coordinating the ownership
+handoff. See the [COO ownership and migration guide](../../docs/migrations/3.5-3.6-migration.md)
+for existing installations and obsolete OperatorGroup cleanup.
 
 ### Example: Enable kserve
 
@@ -426,18 +671,21 @@ dependencies:
 ### Global Settings
 
 ```yaml
-global:
-  # Installation type (currently only olm is supported)
-  installationType: olm
-  
-  # OLM settings
-  olm:
-    installPlanApproval: Automatic
-    source: redhat-operators
-    sourceNamespace: openshift-marketplace
-  
-  # Common labels for all resources
-  labels: {}
+# Deployment profile: default (all Removed), rhaii, maas
+# Explicit managementState values override the profile.
+profile: default
+
+# Skip CRD existence checks (required for ArgoCD; renders all CRs upfront)
+skipCrdCheck: false
+
+# OLM settings for operator subscriptions
+olm:
+  installPlanApproval: Automatic
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+
+# Common labels for all resources
+labels: {}
 ```
 
 ### Components
@@ -463,10 +711,10 @@ components:
     dsc:
       managementState: Managed  # Managed | Removed (default: Removed)
 
-  modelregistry:
+  aiHub:
     dsc:
       managementState: Managed
-      registriesNamespace: my-custom-namespace  # overrides operator-type default
+      instancesNamespace: my-custom-namespace  # overrides operator-type default
 
   workbenches:
     dsc:
@@ -476,7 +724,7 @@ components:
 
 All components default to `Removed`. When set to `Managed` or `Unmanaged`, the component's dependencies are auto-enabled.
 
-Components with operator-type-specific defaults (like `modelregistry` and `workbenches`) will use appropriate namespace values based on whether you're using `odh` or `rhoai` operator type, unless explicitly overridden.
+Components with operator-type-specific defaults (like `aiHub` and `workbenches`) will use appropriate namespace values based on whether you're using `odh` or `rhoai` operator type, unless explicitly overridden.
 
 #### How Component Dependencies Work
 
@@ -532,7 +780,7 @@ This chart works with ArgoCD but requires specific configuration:
 
 ### Why `skipCrdCheck: true` is required
 
-ArgoCD renders Helm templates **without cluster access**, so the `lookup` function (used to check if CRDs exist) always returns empty results. You must set `global.skipCrdCheck: true` to render all CRs upfront.
+ArgoCD renders Helm templates **without cluster access**, so the `lookup` function (used to check if CRDs exist) always returns empty results. You must set `skipCrdCheck: true` to render all CRs upfront.
 
 ### Why `SkipDryRunOnMissingResource` is required
 
@@ -553,11 +801,11 @@ spec:
     path: charts/rhai-on-openshift-chart
     helm:
       values: |
-        global:
-          skipCrdCheck: true
+        skipCrdCheck: true
         components:
           kserve:
-            managementState: Managed
+            dsc:
+              managementState: Managed
   destination:
     server: https://kubernetes.default.svc
     namespace: rhoai-system

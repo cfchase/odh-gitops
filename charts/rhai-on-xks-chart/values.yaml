@@ -48,7 +48,7 @@ rhaiOperator:
   #     value: quay.io/opendatahub/kserve-controller:latest
 
 hooks:
-  cliImage: registry.redhat.io/openshift4/ose-cli-rhel9:v4.20@sha256:d876c1d98b39d65c00c4261431bb84b90284699f3aef84d8701a25c786fb79a1
+  cliImage: registry.redhat.io/openshift4/ose-cli-rhel9:v4.20@sha256:11d63d113e970c5e219e721cee81ad6bd271971e04a024c45f38f699d5354573
   # Default resources for all hook job containers
   resources:
     limits:
@@ -80,7 +80,9 @@ components:
   kserve:
     # Create Kserve CR via post-install hook
     enabled: true
-    spec: {}
+    spec:
+      modelExpress:
+        managementState: Removed
     # Gateway configuration for KServe inference
     gateway:
       # Create Gateway and ConfigMaps via post-install hook
@@ -101,10 +103,17 @@ components:
   aigateway:
     # Enable operator-managed AIGateway module (includes Models as a Service)
     enabled: false
-    # AIGateway component CR spec — sets modelsAsAService.managementState: Managed on the AIGateway CR
+    # AIGateway component CR spec — MaaS and Batch Gateway default to Removed.
     spec:
       modelsAsAService:
-        managementState: Managed
+        managementState: Removed
+      # AI Grid operator and CRDs. Keep Removed unless the deployed
+      # AI Gateway operator supports AI Grid.
+      aiGrid:
+        managementState: Removed
+      # Batch Gateway lifecycle. Keep Removed until its RHAII release default is confirmed.
+      batchGateway:
+        managementState: Removed
     # Models as a Service (MaaS) configuration
     modelsAsAService:
       # MaaS gateway configuration
@@ -168,6 +177,9 @@ azure:
             namespace: istio-system
         rhcl:
           managementPolicy: Unmanaged   # Opt-in: set to Managed to have CCM install RHCL (Kuadrant)
+          configuration:
+            operatorNamespace: kuadrant-operators
+            operandNamespace: kuadrant-system
 
 # CoreWeave cloud configuration
 coreweave:
@@ -207,6 +219,9 @@ coreweave:
             namespace: istio-system
         rhcl:
           managementPolicy: Unmanaged   # Opt-in: set to Managed to have CCM install RHCL (Kuadrant)
+          configuration:
+            operatorNamespace: kuadrant-operators
+            operandNamespace: kuadrant-system
 
 # AWS cloud configuration
 aws:
@@ -246,6 +261,9 @@ aws:
             namespace: istio-system
         rhcl:
           managementPolicy: Unmanaged   # Opt-in: set to Managed to have CCM install RHCL (Kuadrant)
+          configuration:
+            operatorNamespace: kuadrant-operators
+            operandNamespace: kuadrant-system
 
 # cert-manager operator subchart
 cert-manager-operator:

@@ -25,6 +25,12 @@ charts:
           - skipCrdCheck=true
           - operator.type=rhoai
 
+      - name: operator-with-external-namespace
+        setFlags:
+          - skipCrdCheck=true
+          - operator.type=rhoai
+          - operator.rhoai.olm.createNamespace=false
+
       - name: all-components-managed
         valuesFiles:
           - docs/examples/values-all-components-managed.yaml
@@ -49,12 +55,104 @@ charts:
           - profile=rhaii
           - components.kserve.dependencies.jobSet=true
 
-      - name: enable-llm-d-wva
+      - name: v3-aihub-data
+        setFlags:
+          - skipCrdCheck=true
+          - components.aiHub.dsc.managementState=Managed
+          - components.data.dsc.featureStore.managementState=Managed
+          - components.data.dsc.dataRegistry.managementState=Managed
+          - components.dashboard.dsc.standard.managementState=Managed
+          - components.dashboard.dsc.maasPortal.managementState=Managed
+          - components.workbenches.dsc.workbenchesV2.managementState=Managed
+          - components.mcplifecycleoperator.dsc.managementState=Managed
+
+      # Structural components must activate dependencies through their children
+      # (correct-by-test for the DSC v3 structural branch in the shared helpers)
+      - name: structural-component-dependency
+        setFlags:
+          - skipCrdCheck=true
+          - components.dashboard.dependencies.certManager=true
+          - components.dashboard.dsc.standard.managementState=Managed
+
+      - name: structural-component-dependency-removed
+        setFlags:
+          - skipCrdCheck=true
+          - components.dashboard.dependencies.certManager=true
+
+      # Deprecated DSC v2 keys: translated to v3 and rendered with
+      # deprecation comments (and a NOTES.txt Deprecation Notices section
+      # via install --dry-run)
+      - name: legacy-modelregistry
+        setFlags:
+          - skipCrdCheck=true
+          - components.modelregistry.dsc.managementState=Managed
+          - components.modelregistry.dsc.registriesNamespace=my-registries
+
+      - name: legacy-feastoperator
+        setFlags:
+          - skipCrdCheck=true
+          - components.feastoperator.dsc.managementState=Managed
+
+      - name: legacy-dashboard-managementstate
+        setFlags:
+          - skipCrdCheck=true
+          - components.dashboard.dsc.managementState=Managed
+
+      # Legacy key present but all-null: pruned silently, no translation,
+      # no deprecation notice, render identical to default
+      - name: legacy-null-key
+        setFlags:
+          - skipCrdCheck=true
+        setJsonFlags:
+          - 'components.modelregistry={"dsc":{"managementState":null}}'
+
+      # Legacy operator-type defaults are translated old-wins (upgrade
+      # continuity for customized defaults)
+      - name: legacy-modelregistry-defaults
+        setJsonFlags:
+          - 'components.modelregistry={"defaults":{"odh":{"registriesNamespace":"my-default-ns"}}}'
+        setFlags:
+          - skipCrdCheck=true
+
+      # Customizing defaults on BOTH old and new keys is ambiguous and must fail
+      - name: legacy-defaults-conflict
+        expectFail: true
+        expectMessage: "components.modelregistry.defaults.odh.registriesNamespace and components.aiHub.defaults.odh.instancesNamespace are both customized"
+        setJsonFlags:
+          - 'components.modelregistry={"defaults":{"odh":{"registriesNamespace":"old-ns"}}}'
+          - 'components.aiHub={"defaults":{"odh":{"instancesNamespace":"new-ns"}}}'
+        setFlags:
+          - skipCrdCheck=true
+
+      # Old and new keys set at once is ambiguous and must fail the render
+      - name: legacy-and-new-conflict
+        expectFail: true
+        expectMessage: "components.modelregistry and components.aiHub are mutually exclusive"
+        setFlags:
+          - skipCrdCheck=true
+          - components.modelregistry.dsc.managementState=Managed
+          - components.aiHub.dsc.managementState=Managed
+
+      # Deprecated keys with no DSC v3 equivalent must fail the render
+      - name: legacy-trainingoperator
+        expectFail: true
+        expectMessage: "components.trainingoperator was removed in DSC v3"
+        setFlags:
+          - skipCrdCheck=true
+          - components.trainingoperator.dsc.managementState=Managed
+
+      - name: legacy-kserve-wva
+        expectFail: true
+        expectMessage: "components.kserve.dsc.wva was removed in DSC v3"
+        setFlags:
+          - skipCrdCheck=true
+          - components.kserve.dsc.wva.managementState=Managed
+
+      - name: enable-modelexpress
         setFlags:
           - skipCrdCheck=true
           - components.kserve.dsc.managementState=Managed
-          - components.kserve.dsc.wva.managementState=Managed
-          - components.kserve.dependencies.customMetricsAutoscaler=true
+          - components.kserve.dsc.modelExpress.managementState=Managed
 
       - name: with-rhcl-config
         setFlags:
@@ -72,6 +170,111 @@ charts:
         setJsonFlags:
           - 'components.aigateway.modelsAsAService.gateway.spec.listeners[0].allowedRoutes.namespaces={"from":"Selector","selector":{"matchLabels":{"maas.opendatahub.io/gateway-access":"true"}}}'
           - 'components.kserve.gateway.spec.listeners[0].allowedRoutes.namespaces={"from":"Selector","selector":{"matchLabels":{"maas.opendatahub.io/gateway-access":"true"}}}'
+
+      - name: ai-grid-profile
+        setFlags:
+          - skipCrdCheck=true
+          - operator.type=odh
+          - profile=ai-grid
+        setJsonFlags:
+          - 'components.aigateway.modelsAsAService.gateway.spec.listeners[0].allowedRoutes.namespaces={"from":"Selector","selector":{"matchLabels":{"maas.opendatahub.io/gateway-access":"true"}}}'
+          - 'components.kserve.gateway.spec.listeners[0].allowedRoutes.namespaces={"from":"Selector","selector":{"matchLabels":{"maas.opendatahub.io/gateway-access":"true"}}}'
+
+      - name: ai-grid-removed
+        setFlags:
+          - skipCrdCheck=true
+          - profile=ai-grid
+          - components.aigateway.dsc.aiGrid.managementState=Removed
+
+      - name: ai-grid-parent-removed
+        setFlags:
+          - skipCrdCheck=true
+          - profile=ai-grid
+          - components.aigateway.dsc.managementState=Removed
+
+      - name: ai-grid-manual
+        setFlags:
+          - skipCrdCheck=true
+          - components.aigateway.dsc.managementState=Managed
+          - components.aigateway.dsc.aiGrid.managementState=Managed
+
+      - name: ai-grid-external-runtimes
+        setFlags:
+          - skipCrdCheck=true
+          - profile=ai-grid
+          - grid-enrollment.enabled=false
+          - praxis-gateway.enabled=false
+
+      - name: ai-grid-external-gateway
+        setFlags:
+          - skipCrdCheck=true
+          - profile=ai-grid
+          - praxis-gateway.enabled=false
+
+      - name: ai-grid-external-enrollment
+        setFlags:
+          - skipCrdCheck=true
+          - profile=ai-grid
+          - grid-enrollment.enabled=false
+
+      - name: ai-grid-invites
+        setFlags:
+          - skipCrdCheck=true
+          - profile=ai-grid
+          - grid-enrollment.enrollment.authz=kube
+          - grid-enrollment.invites.site-a.network=grid
+
+      - name: ai-grid-reject-udp
+        expectFail: true
+        expectMessage: "protocol"
+        setFlags:
+          - skipCrdCheck=true
+          - profile=ai-grid
+          - praxis-gateway.port.protocol=UDP
+
+      - name: ai-grid-reject-plaintext-route
+        expectFail: true
+        expectMessage: "inline/external config requires route.externalTls"
+        setFlags:
+          - skipCrdCheck=true
+          - profile=ai-grid
+          - praxis-gateway.route.enabled=true
+          - praxis-gateway.route.host=gateway.apps.example.com
+
+      - name: ai-grid-reject-http-telemetry
+        expectFail: true
+        expectMessage: "plaintext telemetry"
+        setFlags:
+          - skipCrdCheck=true
+          - profile=ai-grid
+          - praxis-gateway.praxisConfig.source=render
+          - praxis-gateway.praxisConfig.render.telemetry.otlpEndpoint=http://collector:4317
+
+      - name: ai-grid-reject-blocked-loadbalancer
+        expectFail: true
+        expectMessage: "networkPolicy.from requires explicit enrollment clients"
+        setFlags:
+          - skipCrdCheck=true
+          - profile=ai-grid
+          - grid-enrollment.route.enabled=false
+          - grid-enrollment.host=enrollment.example.com
+
+      - name: ai-grid-related-images
+        valuesFiles:
+          - charts/rhai-on-openshift-chart/test/values-ai-grid-images.yaml
+        setFlags:
+          - skipCrdCheck=true
+
+      - name: ai-grid-hub
+        setFlags:
+          - profile=ai-grid
+          - grid-enrollment.route.enabled=false
+          - skipCrdCheck=true
+          - praxis-gateway.praxisConfig.byo.configMapName=grid-gateway-config
+          - grid-enrollment.enrollment.authz=kube
+          - grid-enrollment.enrollment.serviceAccount.create=true
+          - grid-enrollment.db.type=external
+          - grid-enrollment.db.external.connectionUrlSecretRef=maas-db-config
 
       - name: maas-profile-with-clusterip-route
         setFlags:
@@ -98,6 +301,37 @@ charts:
           - services.monitoring.dsci.managementState=Managed
           - dependencies.loki.olm.createNamespace=false
           - dependencies.loki.olm.createOperatorGroup=false
+
+      - name: monitoring-with-custom-coo-operatorgroup
+        setFlags:
+          - skipCrdCheck=true
+          - services.monitoring.dsci.managementState=Managed
+          - dependencies.clusterObservability.olm.operatorGroupName=custom-coo-group
+
+      - name: monitoring-with-external-coo
+        setFlags:
+          - skipCrdCheck=true
+          - services.monitoring.dsci.managementState=Managed
+          - dependencies.clusterObservability.enabled=false
+
+      - name: monitoring-with-logs
+        valuesFiles:
+          - docs/examples/values-monitoring-with-logs.yaml
+        setFlags:
+          - skipCrdCheck=true
+          - operator.type=rhoai
+
+      - name: monitoring-with-usage-logs
+        valuesFiles:
+          - docs/examples/values-monitoring-with-usage-logs.yaml
+        setFlags:
+          - skipCrdCheck=true
+          - operator.type=rhoai
+
+      - name: agent-sandbox-enabled
+        setFlags:
+          - skipCrdCheck=true
+          - dependencies.agentSandbox.enabled=true
 
   dependencies/cert-manager-operator:
     snapshots:
@@ -130,6 +364,9 @@ charts:
           - azure.kubernetesEngine.spec.dependencies.lws.configuration.namespace=custom-lws
           - azure.kubernetesEngine.spec.dependencies.lws.managementPolicy=Managed
           - azure.kubernetesEngine.spec.dependencies.sailOperator.configuration.namespace=custom-istio
+          - azure.kubernetesEngine.spec.dependencies.rhcl.managementPolicy=Managed
+          - azure.kubernetesEngine.spec.dependencies.rhcl.configuration.operatorNamespace=custom-kuadrant-operators
+          - azure.kubernetesEngine.spec.dependencies.rhcl.configuration.operandNamespace=custom-kuadrant-system
         setJsonFlags:
           - 'components.kserve.gateway.allowedRoutes.namespaces={"from":"Selector","selector":{"matchLabels":{"inference-gateway-access":"true"}}}'
 
@@ -249,13 +486,56 @@ charts:
         setFlags:
           - azure.enabled=true
           - components.aigateway.enabled=true
+          - components.aigateway.spec.modelsAsAService.managementState=Managed
           - components.kserve.gateway.allowedRoutes.namespaces.from=Same
           - components.aigateway.modelsAsAService.gateway.allowedRoutes.namespaces.from=Same
+
+      - name: azure-with-aigateway-defaults
+        setFlags:
+          - azure.enabled=true
+          - components.aigateway.enabled=true
+          - components.kserve.gateway.allowedRoutes.namespaces.from=Same
+          - components.aigateway.modelsAsAService.gateway.allowedRoutes.namespaces.from=Same
+
+      - name: azure-with-batch-gateway
+        setFlags:
+          - azure.enabled=true
+          - components.aigateway.enabled=true
+          - components.aigateway.spec.batchGateway.managementState=Managed
+          - components.aigateway.modelsAsAService.gateway.create=false
+          - imagePullSecret.dockerConfigJson=testauth
+          - components.kserve.gateway.allowedRoutes.namespaces.from=Same
+
+      - name: azure-with-ai-grid
+        setFlags:
+          - azure.enabled=true
+          - imagePullSecret.dockerConfigJson=testauth
+          - components.aigateway.enabled=true
+          - components.aigateway.modelsAsAService.gateway.create=false
+          - components.aigateway.spec.aiGrid.managementState=Managed
+          - components.kserve.gateway.allowedRoutes.namespaces.from=Same
+
+      - name: azure-with-maas-and-batch-gateway
+        setFlags:
+          - azure.enabled=true
+          - components.aigateway.enabled=true
+          - components.aigateway.spec.modelsAsAService.managementState=Managed
+          - components.aigateway.spec.batchGateway.managementState=Managed
+          - components.kserve.gateway.allowedRoutes.namespaces.from=Same
+          - components.aigateway.modelsAsAService.gateway.allowedRoutes.namespaces.from=Same
+
+      - name: azure-with-modelexpress
+        setFlags:
+          - azure.enabled=true
+          - imagePullSecret.dockerConfigJson=testauth
+          - components.kserve.spec.modelExpress.managementState=Managed
+          - components.kserve.gateway.allowedRoutes.namespaces.from=Same
 
       - name: azure-with-maas-and-pull-secret
         setFlags:
           - azure.enabled=true
           - components.aigateway.enabled=true
+          - components.aigateway.spec.modelsAsAService.managementState=Managed
           - imagePullSecret.dockerConfigJson=testauth
           - components.kserve.gateway.allowedRoutes.namespaces.from=Same
           - components.aigateway.modelsAsAService.gateway.allowedRoutes.namespaces.from=Same

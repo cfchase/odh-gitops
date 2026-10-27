@@ -49,13 +49,17 @@ podman login registry.redhat.io --authfile /path/to/auth.json
 
 The `imagePullSecret.dockerConfigJson` parameter:
 
-1. Creates a `kubernetes.io/dockerconfigjson` Secret named `rhai-pull-secret` in all chart-managed namespaces (operator, applications, release, cloud manager and all dependency namespaces)
+1. Creates a `kubernetes.io/dockerconfigjson` Secret named `rhai-pull-secret` in the operator, applications, release, cloud manager and managed dependency namespaces
 2. Adds `imagePullSecrets` to all chart-managed ServiceAccounts (RHAI operator, cloud manager, llmisvc-controller-manager, and the post-install hook)
+
+When MaaS is managed and pull credentials are provided, a pre-install/pre-upgrade Job creates `redhat-ai-gateway-infra` before the chart creates its pull Secret and ServiceAccounts. An earlier hook creates a separate `rhai-maas-ns-pull-secret` in the release namespace for the Job using the same credentials. Hook cleanup removes only this bootstrap Secret, leaving the release-managed `rhai-pull-secret` untouched. The bootstrap Secret also runs as a pre-delete hook to clean up leftovers on uninstall.
 
 The secret name defaults to `rhai-pull-secret` and **should not** be changed.
 
 > [!NOTE]
-> Pull secrets for dependency namespaces (`cert-manager-operator`, `cert-manager`, `istio-system`, `openshift-lws-operator`) are managed by this chart by default. To customize which dependency namespaces receive pull secrets, set `imagePullSecret.dependencyNamespaces`.
+> Pull secrets for managed dependency namespaces are created automatically when set as `Managed`. The chart uses the configured namespaces. Use `imagePullSecret.dependencyNamespaces` for additional namespaces.
+
+The chart renders Namespace resources for managed dependency namespaces. If a dependency namespace already exists and should be managed by this Helm release, rerun the installation or upgrade with Helm's `--take-ownership` flag. The chart keeps dependency namespaces on uninstall.
 
 ## Installation
 
@@ -151,12 +155,15 @@ components:
 
 ### MaaS Gateway
 
-When AI Gateway is enabled (`components.aigateway.enabled: true`), the chart creates a MaaS Gateway CR via a post-install hook. The same `allowedRoutes` configuration is **required**:
+MaaS is opt-in on xKS. Set `components.aigateway.spec.modelsAsAService.managementState` to `Managed` to deploy it; the chart creates a MaaS Gateway CR via a post-install hook. The same `allowedRoutes` configuration is **required**:
 
 ```yaml
 components:
   aigateway:
     enabled: true
+    spec:
+      modelsAsAService:
+        managementState: Managed
     modelsAsAService:
       gateway:
         allowedRoutes:
@@ -168,6 +175,44 @@ components:
 ```
 
 When using `Selector`, the specified labels must be applied to each target namespace (e.g. `kubectl label ns <model-namespace> maas-gateway-access=true`).
+
+### Batch Gateway
+
+AI Gateway can independently manage its subcomponents. Batch Gateway defaults to `Removed`. To install the Batch Gateway operator without enabling other subcomponents, set its `managementState` to `Managed`:
+
+```yaml
+components:
+  aigateway:
+    enabled: true
+    modelsAsAService:
+      gateway:
+        create: false
+    spec:
+      batchGateway:
+        managementState: Managed
+```
+
+The chart creates the `Platform` and `AIGateway` resources. The AI Gateway operator deploys Batch Gateway using the release's digest-pinned related images. Backing services and workload resources must be configured separately.
+
+### AI Grid
+
+AI Grid is opt-in on xKS. Set `components.aigateway.spec.aiGrid.managementState` to `Managed` to install the Grid CRDs and `grid-operator`:
+
+```yaml
+components:
+  aigateway:
+    enabled: true
+    spec:
+      aiGrid:
+        managementState: Managed
+```
+
+The chart creates the Grid namespace (`redhat-ai-grid` by default) and, when an image pull secret is enabled, precreates the `grid-operator`
+ServiceAccount with that secret. These namespace and ServiceAccount names are part of the AI Gateway operator contract and must stay aligned
+with the operator deployment. The AI Gateway operator then installs the Grid CRDs and operator. Override the Grid operator image with
+`rhaiOperator.relatedImages` using `RELATED_IMAGE_ODH_PRAXIS_AI_GRID_OPERATOR_IMAGE`.
+When using a custom applications namespace, keep it to 55 characters or fewer so the chart can create the derived
+`<applications-namespace>-ai-grid` namespace.
 
 ## Managed Dependencies
 
@@ -208,6 +253,27 @@ For the configuration reference, please refer to the [API reference](api-docs.md
 ## Testing with kind
 
 You can test the chart locally using [kind](https://kind.sigs.k8s.io/).
+
+On a disposable test cluster, verify MaaS namespace creation and hook credentials without deploying MaaS operands:
+
+**Warning:** Test 6 first uninstalls the configured Helm release and deletes `redhat-ai-gateway-infra`, including its contents.
+It waits for cleanup and stops on failure. Do not run it against a shared or production cluster.
+
+```bash
+RELEASE_NAME=rhaii NAMESPACE=rhai-gitops PULL_SECRET=/path/to/auth.json \
+  bash ./charts/rhai-on-xks-chart/scripts/verify.sh 6
+```
+
+This test covers installation, hook cleanup, preservation of the release pull Secret through successful upgrades, failed hooks, and retries, and removal of leftover bootstrap Secrets on uninstall. It runs after the operator lifecycle tests in xKS E2E CI.
+
+Cleanup ensures that the Helm release, MaaS infrastructure namespace, and both release-namespace pull Secrets are absent before installation.
+Other retained namespaces and CRDs may remain, so this is not an installation test on an empty cluster.
+
+The e2e suite uses `test/values-e2e.yaml`, including ODH image digests for KServe and
+AIGateway controllers and services. `scripts/update-bundle.sh` refreshes these pins
+from `manifests-config.yaml` in the same rhods-operator checkout used for the chart
+templates. To refresh only the e2e images, run
+`bash charts/rhai-on-xks-chart/scripts/sync-e2e-images.sh /path/to/operator/manifests-config.yaml`.
 
 ```bash
 # Create a local cluster

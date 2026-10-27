@@ -28,6 +28,8 @@ RHAI on XKS Helm chart for non-OLM installation on non-OpenShift Kubernetes serv
 | aws.kubernetesEngine.spec.dependencies.gatewayAPI.managementPolicy | string | `"Managed"` |  |
 | aws.kubernetesEngine.spec.dependencies.lws.configuration.namespace | string | `"openshift-lws-operator"` |  |
 | aws.kubernetesEngine.spec.dependencies.lws.managementPolicy | string | `"Unmanaged"` |  |
+| aws.kubernetesEngine.spec.dependencies.rhcl.configuration.operandNamespace | string | `"kuadrant-system"` |  |
+| aws.kubernetesEngine.spec.dependencies.rhcl.configuration.operatorNamespace | string | `"kuadrant-operators"` |  |
 | aws.kubernetesEngine.spec.dependencies.rhcl.managementPolicy | string | `"Unmanaged"` |  |
 | aws.kubernetesEngine.spec.dependencies.sailOperator.configuration.namespace | string | `"istio-system"` |  |
 | aws.kubernetesEngine.spec.dependencies.sailOperator.managementPolicy | string | `"Managed"` |  |
@@ -45,6 +47,8 @@ RHAI on XKS Helm chart for non-OLM installation on non-OpenShift Kubernetes serv
 | azure.kubernetesEngine.spec.dependencies.gatewayAPI.managementPolicy | string | `"Managed"` |  |
 | azure.kubernetesEngine.spec.dependencies.lws.configuration.namespace | string | `"openshift-lws-operator"` |  |
 | azure.kubernetesEngine.spec.dependencies.lws.managementPolicy | string | `"Unmanaged"` |  |
+| azure.kubernetesEngine.spec.dependencies.rhcl.configuration.operandNamespace | string | `"kuadrant-system"` |  |
+| azure.kubernetesEngine.spec.dependencies.rhcl.configuration.operatorNamespace | string | `"kuadrant-operators"` |  |
 | azure.kubernetesEngine.spec.dependencies.rhcl.managementPolicy | string | `"Unmanaged"` |  |
 | azure.kubernetesEngine.spec.dependencies.sailOperator.configuration.namespace | string | `"istio-system"` |  |
 | azure.kubernetesEngine.spec.dependencies.sailOperator.managementPolicy | string | `"Managed"` |  |
@@ -59,11 +63,13 @@ RHAI on XKS Helm chart for non-OLM installation on non-OpenShift Kubernetes serv
 | components.aigateway.modelsAsAService.gateway.gatewayClassName | string | `"istio"` |  |
 | components.aigateway.modelsAsAService.gateway.name | string | `"maas-default-gateway"` |  |
 | components.aigateway.modelsAsAService.gateway.namespace | string | `""` |  |
-| components.aigateway.spec.modelsAsAService.managementState | string | `"Managed"` |  |
+| components.aigateway.spec.aiGrid.managementState | string | `"Removed"` |  |
+| components.aigateway.spec.batchGateway.managementState | string | `"Removed"` |  |
+| components.aigateway.spec.modelsAsAService.managementState | string | `"Removed"` |  |
 | components.kserve.enabled | bool | `true` |  |
 | components.kserve.gateway.allowedRoutes.namespaces | object | `{}` |  |
 | components.kserve.gateway.create | bool | `true` |  |
-| components.kserve.spec | object | `{}` |  |
+| components.kserve.spec.modelExpress.managementState | string | `"Removed"` |  |
 | coreweave.cloudManager.image | string | `"quay.io/opendatahub/opendatahub-operator:latest"` |  |
 | coreweave.cloudManager.imagePullPolicy | string | `"Always"` |  |
 | coreweave.cloudManager.namespace | string | `"rhai-cloudmanager-system"` |  |
@@ -78,6 +84,8 @@ RHAI on XKS Helm chart for non-OLM installation on non-OpenShift Kubernetes serv
 | coreweave.kubernetesEngine.spec.dependencies.gatewayAPI.managementPolicy | string | `"Managed"` |  |
 | coreweave.kubernetesEngine.spec.dependencies.lws.configuration.namespace | string | `"openshift-lws-operator"` |  |
 | coreweave.kubernetesEngine.spec.dependencies.lws.managementPolicy | string | `"Unmanaged"` |  |
+| coreweave.kubernetesEngine.spec.dependencies.rhcl.configuration.operandNamespace | string | `"kuadrant-system"` |  |
+| coreweave.kubernetesEngine.spec.dependencies.rhcl.configuration.operatorNamespace | string | `"kuadrant-operators"` |  |
 | coreweave.kubernetesEngine.spec.dependencies.rhcl.managementPolicy | string | `"Unmanaged"` |  |
 | coreweave.kubernetesEngine.spec.dependencies.sailOperator.configuration.namespace | string | `"istio-system"` |  |
 | coreweave.kubernetesEngine.spec.dependencies.sailOperator.managementPolicy | string | `"Managed"` |  |
@@ -87,7 +95,7 @@ RHAI on XKS Helm chart for non-OLM installation on non-OpenShift Kubernetes serv
 | gateway.tls.enabled | bool | `true` |  |
 | gateway.tls.issuerRef.kind | string | `"ClusterIssuer"` |  |
 | gateway.tls.issuerRef.name | string | `"rhai-ca-issuer"` |  |
-| hooks.cliImage | string | `"registry.redhat.io/openshift4/ose-cli-rhel9:v4.20@sha256:d876c1d98b39d65c00c4261431bb84b90284699f3aef84d8701a25c786fb79a1"` |  |
+| hooks.cliImage | string | `"registry.redhat.io/openshift4/ose-cli-rhel9:v4.20@sha256:11d63d113e970c5e219e721cee81ad6bd271971e04a024c45f38f699d5354573"` |  |
 | hooks.postInstallCrs.enabled | bool | `true` |  |
 | hooks.resources.limits.cpu | string | `"200m"` |  |
 | hooks.resources.limits.memory | string | `"512Mi"` |  |
