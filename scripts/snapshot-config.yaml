@@ -179,7 +179,8 @@ charts:
         setFlags:
           - skipCrdCheck=true
           - profile=maas
-          - dependencies.rhcl.config.kuadrantOperatorAuthServiceTimeout=1s
+          - dependencies.rhcl.olm.config.env[0].name=AUTH_SERVICE_TIMEOUT
+          - dependencies.rhcl.olm.config.env[0].value=1s
 
       - name: maas-profile
         setFlags:

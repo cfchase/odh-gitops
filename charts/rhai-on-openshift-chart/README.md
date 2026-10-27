@@ -851,7 +851,7 @@ On a fresh installation, the Authorino operator may not have created `Deployment
 
 ### Tune the Kuadrant auth-service timeout
 
-Kuadrant configures its Wasm auth call with a `200ms` timeout by default. For cross-cluster OIDC providers or other higher-latency authorization chains, set `dependencies.rhcl.config.kuadrantOperatorAuthServiceTimeout` to a Go duration such as `1s`. The chart emits a partial Deployment patch intended for Argo CD server-side apply against the OLM-managed `kuadrant-operator-controller-manager`; the Kuadrant operator then uses the value when it regenerates Gateway `EnvoyFilter` resources.
+Kuadrant configures its Wasm auth call with a `200ms` timeout by default. For cross-cluster OIDC providers or other higher-latency authorization chains, set `AUTH_SERVICE_TIMEOUT` through `dependencies.rhcl.olm.config.env`. OLM owns the operator Deployment and will preserve the variable when it reconciles the Subscription.
 
 ## Troubleshooting
 

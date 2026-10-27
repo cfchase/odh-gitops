@@ -59,25 +59,6 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 
 ---
-# Source: rhai-on-openshift-chart/templates/dependencies/rhcl/kuadrant-operator-auth-timeout.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: kuadrant-operator-controller-manager
-  namespace: kuadrant-system
-  annotations:
-    argocd.argoproj.io/sync-options: ServerSideApply=true,Validate=false,DisableClientSideApplyMigration=true,Prune=false,Delete=false
-    argocd.argoproj.io/sync-wave: "10"
-spec:
-  template:
-    spec:
-      containers:
-        - name: manager
-          env:
-            - name: AUTH_SERVICE_TIMEOUT
-              value: "1s"
-
----
 # Source: rhai-on-openshift-chart/templates/operator/dscinitialization.yaml
 apiVersion: dscinitialization.opendatahub.io/v2
 kind: DSCInitialization
@@ -405,6 +386,10 @@ spec:
   name: rhcl-operator
   source: redhat-operators
   sourceNamespace: openshift-marketplace
+  config:
+    env:
+    - name: AUTH_SERVICE_TIMEOUT
+      value: 1s
 
 ---
 # Source: rhai-on-openshift-chart/templates/operator/operator.yaml
