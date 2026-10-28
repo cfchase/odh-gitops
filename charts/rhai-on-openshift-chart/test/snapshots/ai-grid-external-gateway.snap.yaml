@@ -618,7 +618,7 @@ spec:
             - "until pg_isready -h grid-enrollment-db -p 5432; do echo 'waiting for db'; sleep 2; done"
       containers:
         - name: enrollment
-          image: "ghcr.io/praxis-proxy/grid-enrollment:v0.2.2"
+          image: "ghcr.io/praxis-proxy/grid-enrollment@sha256:f84f4d3d04922b196b7a743ea3ea49c0f383481e2c9f3c56719305843f4b223a"
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -1051,7 +1051,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: ca-bootstrap
-          image: "ghcr.io/praxis-proxy/grid-enrollment:v0.2.2"
+          image: "ghcr.io/praxis-proxy/grid-enrollment@sha256:f84f4d3d04922b196b7a743ea3ea49c0f383481e2c9f3c56719305843f4b223a"
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
