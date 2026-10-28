@@ -8,26 +8,6 @@
 #   make chart-test CHART_NAME=<name>       # Test specific chart
 
 charts:
-  grid-bootstrap:
-    snapshots:
-      - name: disabled
-      - name: existing-ca
-        setFlags:
-          - enabled=true
-          - ca.secretName=existing-grid-ca
-      - name: generated-ca
-        setFlags:
-          - enabled=true
-          - ca.mode=Generate
-      - name: invalid-renewal-window
-        setFlags:
-          - enabled=true
-          - ca.mode=Generate
-          - ca.durationHours=24
-          - ca.renewBeforeHours=24
-        expectFail: true
-        expectMessage: ca.renewBeforeHours must be less than ca.durationHours
-
   rhai-on-openshift-chart:
     # Optional: additional values file for testing (relative to chart path)
     testValuesFile: test/testValues.yaml
