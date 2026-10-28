@@ -1,4 +1,5 @@
 {{- define "grid-enrollment.rhoai.networkpolicy.yaml" -}}
+{{- if eq .Values.mode "service" }}
 {{- include "grid-enrollment.normalize" . }}
 {{- $v := .Values }}
 {{- if and $v.networkPolicy.enabled (has $v.enrollment.service.type (list "LoadBalancer" "NodePort")) (not (include "grid-enrollment.routeEnabled" .)) (not $v.networkPolicy.from) }}
@@ -57,6 +58,7 @@ spec:
       ports:
         - port: 5432
           protocol: TCP
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

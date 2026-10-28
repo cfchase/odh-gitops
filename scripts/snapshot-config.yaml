@@ -265,6 +265,35 @@ charts:
           - profile=ai-grid
           - grid-enrollment.enabled=false
 
+      - name: ai-grid-external-identities
+        setFlags:
+          - skipCrdCheck=true
+          - profile=ai-grid
+          - grid-enrollment.mode=external
+          - grid-enrollment.external.sites.site-a.secretName=provided-site-a
+          - grid-enrollment.external.sites.site-a.cluster=managed-a
+          - grid-enrollment.external.trustBundleSecretRef=provided-trust
+          - grid-enrollment.external.delivery.enabled=true
+          - grid-enrollment.external.delivery.namespace=grid-system
+
+      - name: ai-grid-existing-ca
+        setFlags:
+          - skipCrdCheck=true
+          - profile=ai-grid
+          - grid-enrollment.mode=external
+          - grid-enrollment.external.certManager.enabled=true
+          - grid-enrollment.external.certManager.issuer.create=true
+
+      - name: ai-grid-generated-ca
+        setFlags:
+          - skipCrdCheck=true
+          - profile=ai-grid
+          - grid-enrollment.mode=external
+          - grid-enrollment.external.certManager.enabled=true
+          - grid-enrollment.external.certManager.issuer.create=true
+          - grid-enrollment.external.certManager.ca.mode=Generate
+          - grid-enrollment.external.sites.site-a.secretName=site-a-identity
+
       - name: ai-grid-invites
         setFlags:
           - skipCrdCheck=true
