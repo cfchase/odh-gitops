@@ -306,7 +306,7 @@ metadata:
     helm.sh/chart: HELM_CHART_VERSION_REDACTED
     app.kubernetes.io/name: grid-enrollment
     app.kubernetes.io/instance: release-test
-    app.kubernetes.io/version: "v0.2.2"
+    app.kubernetes.io/version: "v0.3.0-rc.1"
     app.kubernetes.io/managed-by: Helm
 spec:
   ca:

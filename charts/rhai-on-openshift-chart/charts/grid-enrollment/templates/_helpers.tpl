@@ -273,6 +273,8 @@ Job reads, keys in sorted order.
 */}}
 {{- define "grid-enrollment.normalize" -}}
 {{- $v := .Values }}
+{{- /* Without SWIM there is no SWIM key to create or deliver. */}}
+{{- if eq (dig "membership" "source" "Swim" ($v.grid | default dict)) "Local" }}{{- $_ := set $v.hubSite "swimKeySecretName" "" }}{{- end }}
 {{- if not $v.enrollment.service.type }}
 {{- $lb := and $v.host (not (include "grid-enrollment.routeEnabled" .)) }}
 {{- $_ := set $v.enrollment.service "type" (ternary "LoadBalancer" "ClusterIP" (not (not $lb))) }}
@@ -392,7 +394,18 @@ RUST_LOG for the chart's Rust binaries: log.filter when set, else log.level.
 {{- $log.filter | default $log.level | default "info" -}}
 {{- end }}
 
-{{/* Full image references injected by downstream payloads; shared with sibling charts. */}}
+{{/*
+Pod security context for the helm tests. The chart's own context plus a non-root UID,
+because the test image is busybox and runAsNonRoot alone would refuse to start it. An
+explicit runAsUser wins, so an override still decides.
+*/}}
+{{- define "grid-enrollment.testPodSecurityContext" -}}
+{{- $ctx := deepCopy (.Values.enrollment.podSecurityContext | default dict) -}}
+{{- if not (hasKey $ctx "runAsUser") }}{{- $_ := set $ctx "runAsUser" 65534 -}}{{- end }}
+{{- toYaml $ctx -}}
+{{- end }}
+
+{{/* Full image references injected by downstream payloads. */}}
 {{- define "grid-enrollment.relatedImage" -}}
 {{- range (.root.Values.global | default dict).relatedImages -}}
 {{- if eq .name $.name -}}

@@ -219,7 +219,7 @@ metadata:
     helm.sh/chart: HELM_CHART_VERSION_REDACTED
     app.kubernetes.io/name: grid-enrollment
     app.kubernetes.io/instance: release-test
-    app.kubernetes.io/version: "v0.2.2"
+    app.kubernetes.io/version: "v0.3.0-rc.1"
     app.kubernetes.io/managed-by: Helm
   annotations:
     helm.sh/resource-policy: keep
@@ -256,12 +256,12 @@ apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: "site-a-identity"
-  namespace: default
+  namespace: "default"
   labels:
     helm.sh/chart: HELM_CHART_VERSION_REDACTED
     app.kubernetes.io/name: grid-enrollment
     app.kubernetes.io/instance: release-test
-    app.kubernetes.io/version: "v0.2.2"
+    app.kubernetes.io/version: "v0.3.0-rc.1"
     app.kubernetes.io/managed-by: Helm
 spec:
   secretName: "site-a-identity"
@@ -272,7 +272,7 @@ spec:
   dnsNames:
     - site-a.grid.internal
   duration: "4320h"
-  renewBefore: "720h"
+  renewBefore: "1440h"
   privateKey:
     algorithm: ECDSA
     size: 256
@@ -383,7 +383,7 @@ metadata:
     helm.sh/chart: HELM_CHART_VERSION_REDACTED
     app.kubernetes.io/name: grid-enrollment
     app.kubernetes.io/instance: release-test
-    app.kubernetes.io/version: "v0.2.2"
+    app.kubernetes.io/version: "v0.3.0-rc.1"
     app.kubernetes.io/managed-by: Helm
   annotations:
     helm.sh/resource-policy: keep
@@ -403,7 +403,7 @@ metadata:
     helm.sh/chart: HELM_CHART_VERSION_REDACTED
     app.kubernetes.io/name: grid-enrollment
     app.kubernetes.io/instance: release-test
-    app.kubernetes.io/version: "v0.2.2"
+    app.kubernetes.io/version: "v0.3.0-rc.1"
     app.kubernetes.io/managed-by: Helm
 spec:
   ca:
