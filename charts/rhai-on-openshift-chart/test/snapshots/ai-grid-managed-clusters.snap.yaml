@@ -95,16 +95,16 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: default-grid-bootstrap-membership-a38bf115
-rules:
-- apiGroups: [cluster.open-cluster-management.io]
-  resources: [managedclusters]
-  verbs: [get, list, watch]
 # Hub templates can resolve before the hub policy creates observers. Keep their
 # read permission in the release so inventory additions need no RBAC round trip.
-- apiGroups: [work.open-cluster-management.io]
-  resources: [manifestworks]
-  resourceNames: ["grid-site-observer"]
-  verbs: [get, list, watch]
+rules:
+  - apiGroups: [cluster.open-cluster-management.io]
+    resources: [managedclusters]
+    verbs: [get, list, watch]
+  - apiGroups: [work.open-cluster-management.io]
+    resources: [manifestworks]
+    resourceNames: ["grid-site-observer"]
+    verbs: [get, list, watch]
 
 ---
 # Source: rhai-on-openshift-chart/templates/components/ai-grid.yaml
@@ -461,6 +461,8 @@ kind: Policy
 metadata:
   name: grid-bootstrap-membership-hub
   namespace: default
+  annotations:
+    policy.open-cluster-management.io/trigger-update: "42be75fc23f837fb149ed45d5b88cdacd9402063c569898702bb1e1f0526d774"
 spec:
   remediationAction: enforce
   disabled: false
@@ -636,6 +638,9 @@ kind: Policy
 metadata:
   name: grid-bootstrap-membership
   namespace: default
+  annotations:
+    # A denied lookup cannot watch its dependency; RBAC changes must retry it.
+    policy.open-cluster-management.io/trigger-update: "42be75fc23f837fb149ed45d5b88cdacd9402063c569898702bb1e1f0526d774"
 spec:
   remediationAction: enforce
   disabled: false
