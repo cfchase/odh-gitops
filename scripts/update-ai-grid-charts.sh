@@ -50,6 +50,17 @@ for chart in "${CHARTS[@]}"; do
   echo "  $chart $version"
 done
 
+# Bootstrap is a standalone chart, introduced after the existing runtime charts.
+# Older release refs leave its mirror intact; a ref containing it refreshes it
+# without the RHOAI image adaptations applied to the runtime subcharts.
+if git -C "$TMP_DIR/grid" cat-file -e "$SHA:charts/grid-bootstrap/Chart.yaml" 2>/dev/null; then
+  BOOTSTRAP_DIR="$ROOT/charts/grid-bootstrap"
+  rm -rf "${BOOTSTRAP_DIR:?}"
+  mkdir -p "$BOOTSTRAP_DIR"
+  git -C "$TMP_DIR/grid" archive "$SHA" charts/grid-bootstrap | tar -x --strip-components=2 -C "$BOOTSTRAP_DIR"
+  echo "  grid-bootstrap $("$YQ" '.version' "$BOOTSTRAP_DIR/Chart.yaml") (standalone)"
+fi
+
 python3 "$ROOT/scripts/adapt-ai-grid-charts.py"
 helm dependency update --skip-refresh "$PARENT"
 
