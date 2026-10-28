@@ -1,0 +1,423 @@
+---
+# Source: rhai-on-openshift-chart/templates/operator/operator.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: opendatahub-operator-system
+  annotations:
+    helm.sh/resource-policy: keep
+  labels:
+    helm.sh/chart: HELM_CHART_VERSION_REDACTED
+    app.kubernetes.io/managed-by: Helm
+
+---
+# Source: rhai-on-openshift-chart/templates/components/ai-grid.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: grid-gateway
+  labels:
+    helm.sh/chart: HELM_CHART_VERSION_REDACTED
+    app.kubernetes.io/name: praxis-gateway
+    app.kubernetes.io/instance: release-test
+    app.kubernetes.io/version: "0.7.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: praxis-gateway
+      app.kubernetes.io/instance: release-test
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              grid.opendatahub.io/gateway-client: "true"
+        - namespaceSelector:
+            matchLabels:
+              network.openshift.io/policy-group: ingress
+      ports:
+        - port: 8080
+          protocol: TCP
+
+
+---
+# Source: rhai-on-openshift-chart/templates/components/ai-grid.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grid-gateway-config
+  labels:
+    helm.sh/chart: HELM_CHART_VERSION_REDACTED
+    app.kubernetes.io/name: praxis-gateway
+    app.kubernetes.io/instance: release-test
+    app.kubernetes.io/version: "0.7.0"
+    app.kubernetes.io/managed-by: Helm
+data:
+  praxis.yaml: |
+    admin:
+      metrics_address: "127.0.0.1:9901"
+    listeners:
+      - name: default
+        address: "0.0.0.0:8080"
+        filter_chains: [default]
+    filter_chains:
+      - name: default
+        filters:
+          - filter: static_response
+            status: 200
+            headers:
+              - name: Content-Type
+                value: application/json
+            body: '{"status": "ok", "server": "praxis"}'
+            conditions:
+              - when:
+                  path: "/"
+          - filter: static_response
+            status: 404
+            headers:
+              - name: Content-Type
+                value: application/json
+            body: '{"error": "not found"}'
+
+
+---
+# Source: rhai-on-openshift-chart/templates/components/ai-grid.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: grid-gateway
+  labels:
+    helm.sh/chart: HELM_CHART_VERSION_REDACTED
+    app.kubernetes.io/name: praxis-gateway
+    app.kubernetes.io/instance: release-test
+    app.kubernetes.io/version: "0.7.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: "ClusterIP"
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: "TCP"
+  selector:
+    app.kubernetes.io/name: praxis-gateway
+    app.kubernetes.io/instance: release-test
+
+---
+# Source: rhai-on-openshift-chart/templates/components/ai-grid.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grid-gateway
+  labels:
+    helm.sh/chart: HELM_CHART_VERSION_REDACTED
+    app.kubernetes.io/name: praxis-gateway
+    app.kubernetes.io/instance: release-test
+    app.kubernetes.io/version: "0.7.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: praxis-gateway
+      app.kubernetes.io/instance: release-test
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: gateway
+        app.kubernetes.io/instance: release-test
+        app.kubernetes.io/name: praxis-gateway
+      annotations:
+        checksum/config: 1ca3b980e4b804c577ea8fcbec780f215c0e51892fabf41b882df91b022fce9d
+    spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 35
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: praxis
+          image: ghcr.io/praxis-proxy/grid-gateway@sha256:8659c81c309a84f475f71ec6576058fa558ce5320d885c7a190a133a1093e7ab
+          imagePullPolicy: "IfNotPresent"
+          args:
+            - --config
+            - /etc/praxis/praxis.yaml
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 100
+            runAsGroup: 101
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: "TCP"
+          readinessProbe:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - 'if command -v curl >/dev/null 2>&1; then exec curl -fsS -m 2 -o /dev/null -H
+                ''Host: 127.0.0.1'' "$1"; else exec wget -q -T 2 --header ''Host: 127.0.0.1''
+                -O /dev/null "$1"; fi'
+              - probe
+              - http://127.0.0.1:9901/ready
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - 'if command -v curl >/dev/null 2>&1; then exec curl -fsS -m 2 -o /dev/null -H
+                ''Host: 127.0.0.1'' "$1"; else exec wget -q -T 2 --header ''Host: 127.0.0.1''
+                -O /dev/null "$1"; fi'
+              - probe
+              - http://127.0.0.1:9901/healthy
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "5"]
+          resources:
+            limits:
+              cpu: 2
+              memory: 1Gi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/praxis
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: "grid-gateway-config"
+            items:
+              - key: "praxis.yaml"
+                path: "praxis.yaml"
+
+
+---
+# Source: rhai-on-openshift-chart/templates/operator/dscinitialization.yaml
+apiVersion: dscinitialization.opendatahub.io/v2
+kind: DSCInitialization
+metadata:
+  labels:
+    helm.sh/chart: HELM_CHART_VERSION_REDACTED
+    app.kubernetes.io/managed-by: Helm
+  name: default-dsci
+spec:
+  monitoring:
+    managementState: Removed
+    namespace: opendatahub
+  applicationsNamespace: opendatahub
+  trustedCABundle:
+    managementState: Managed
+    customCABundle: ""
+
+---
+# Source: rhai-on-openshift-chart/templates/operator/datasciencecluster.yaml
+apiVersion: datasciencecluster.opendatahub.io/v3
+kind: DataScienceCluster
+metadata:
+  name: default-dsc
+  labels:
+    helm.sh/chart: HELM_CHART_VERSION_REDACTED
+    app.kubernetes.io/managed-by: Helm
+spec:
+  components:
+    aiHub:
+      instancesNamespace: odh-model-registry
+      managementState: Removed
+    aigateway:
+      aiGrid:
+        managementState: Managed
+      batchGateway:
+        managementState: Removed
+      managementState: Managed
+      modelsAsAService:
+        managementState: Removed
+    aipipelines:
+      managementState: Removed
+    dashboard:
+      maasPortal:
+        managementState: Removed
+      standard:
+        managementState: Removed
+    data:
+      dataRegistry:
+        managementState: Removed
+      featureStore:
+        managementState: Removed
+    kserve:
+      managementState: Removed
+      modelExpress:
+        managementState: Removed
+      nim:
+        managementState: Removed
+      rawDeploymentServiceConfig: Headless
+    kueue:
+      defaultClusterQueueName: default
+      defaultLocalQueueName: default
+      managementState: Removed
+    mcplifecycleoperator:
+      managementState: Removed
+    mlflowoperator:
+      managementState: Removed
+    ogx:
+      managementState: Removed
+    ray:
+      managementState: Removed
+    sparkoperator:
+      managementState: Removed
+    trainer:
+      managementState: Removed
+    trustyai:
+      eval:
+        lmeval:
+          permitCodeExecution: deny
+          permitOnline: deny
+      managementState: Removed
+    workbenches:
+      managementState: Removed
+      workbenchNamespace: opendatahub
+      workbenchesV2:
+        managementState: Removed
+
+---
+# Source: rhai-on-openshift-chart/templates/components/ai-grid.yaml
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSetBinding
+metadata:
+  name: "default"  
+  namespace: "default"
+spec:
+  clusterSet: "default"
+
+---
+# Source: rhai-on-openshift-chart/templates/operator/operator.yaml
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: opendatahub-operator
+  namespace: opendatahub-operator-system
+  labels:
+    helm.sh/chart: HELM_CHART_VERSION_REDACTED
+    app.kubernetes.io/managed-by: Helm
+spec:
+  upgradeStrategy: Default
+
+---
+# Source: rhai-on-openshift-chart/templates/components/ai-grid.yaml
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: grid-identity-site-a
+  namespace: "default"
+spec:
+  clusterSets: ["default"]
+  predicates:
+  - requiredClusterSelector:
+      labelSelector:
+        matchExpressions:
+        - {key: name, operator: In, values: ["managed-a"]}
+        - {key: local-cluster, operator: DoesNotExist}
+
+---
+# Source: rhai-on-openshift-chart/templates/components/ai-grid.yaml
+apiVersion: policy.open-cluster-management.io/v1
+kind: PlacementBinding
+metadata:
+  name: grid-identity-site-a
+  namespace: "default"
+placementRef:
+  apiGroup: cluster.open-cluster-management.io
+  kind: Placement
+  name: grid-identity-site-a
+subjects:
+- apiGroup: policy.open-cluster-management.io
+  kind: Policy
+  name: grid-identity-site-a
+
+---
+# Source: rhai-on-openshift-chart/templates/components/ai-grid.yaml
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: grid-identity-site-a
+  namespace: "default"
+  annotations:
+    policy.open-cluster-management.io/standards: AI Grid
+spec:
+  remediationAction: enforce
+  disabled: false
+  policy-templates:
+  - objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        name: grid-identity-site-a
+      spec:
+        remediationAction: enforce
+        severity: medium
+        object-templates:
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: "grid-system"
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: v1
+            kind: Secret
+            type: kubernetes.io/tls
+            metadata:
+              name: "grid-site-identity"
+              namespace: "grid-system"
+            data:
+              tls.crt: '{{hub fromSecret "default" "provided-site-a" "tls.crt" hub}}'
+              tls.key: '{{hub fromSecret "default" "provided-site-a" "tls.key" hub}}'
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: v1
+            kind: Secret
+            type: Opaque
+            metadata:
+              name: "grid-ca"
+              namespace: "grid-system"
+            data:
+              ca.crt: '{{hub fromSecret "default" "provided-trust" "ca.crt" hub}}'
+
+
+---
+# Source: rhai-on-openshift-chart/templates/operator/operator.yaml
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: opendatahub-operator
+  namespace: opendatahub-operator-system
+  labels:
+    helm.sh/chart: HELM_CHART_VERSION_REDACTED
+    app.kubernetes.io/managed-by: Helm
+spec:
+  channel: fast-3
+  installPlanApproval: Automatic
+  name: opendatahub-operator
+  source: community-operators
+  sourceNamespace: openshift-marketplace
+  config:
+    env:
+    - name: DISABLE_DSC_CONFIG
+      value: "true"

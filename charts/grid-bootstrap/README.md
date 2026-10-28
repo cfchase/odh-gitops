@@ -1,5 +1,9 @@
 # Grid bootstrap
 
+This temporary chart is being replaced by `mode: external` in the existing
+`grid-enrollment` chart. Switch consuming Applications before removing this
+source path; see `grid-enrollment/EXTERNAL.md` for the migration procedure.
+
 Bootstrap establishes the shared certificate authority (CA) for AI Grid Network
 (AGN). Install this chart once on the hub, after cert-manager is ready. It
 creates a namespaced Issuer for site certificates. The enroll flow can then
