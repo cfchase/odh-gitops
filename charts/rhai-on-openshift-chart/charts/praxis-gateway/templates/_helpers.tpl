@@ -215,8 +215,8 @@ Validate praxisConfig: the source, and that each source gets only the settings i
 {{- if and (not $provider) (not $gridServing.enabled) (not (trim (toString $render.model))) }}
 {{- fail "praxisConfig.render.model is required for a consumer without praxisConfig.render.gridServing, and cannot be blank" }}
 {{- end }}
-{{- if not ($render.backends | default list) }}
-{{- fail "praxisConfig.render.backends needs at least one backend when praxisConfig.source is render" }}
+{{- if and (not ($render.backends | default list)) (not $gridServing.enabled) }}
+{{- fail "praxisConfig.render.backends needs at least one backend when praxisConfig.source is render without gridServing" }}
 {{- end }}
 {{- if and (not $auth.mode) (not $provider) }}
 {{- fail "praxisConfig.render.auth.mode is required when praxisConfig.source is render: api-key (needs an image with praxis-policy 0.4 or later) or none (only behind an authenticating front)" }}
@@ -462,27 +462,30 @@ Validate enabled mounts have a non-empty resource name.
 {{- if and .Values.overlay.configMapName (ne .Values.praxisConfig.source "byo") }}
 {{- fail (printf "overlay.configMapName is only supported with praxisConfig.source byo; source %s writes candidates directly into praxis.yaml" .Values.praxisConfig.source) }}
 {{- end }}
-{{- with (.Values.praxisConfig.render.gridServing | default dict) }}
-{{- if .enabled }}
-{{- if ne $.Values.gridIdentity.mountPath "/etc/praxis/tls" }}
-{{- fail "praxisConfig.render.gridServing requires gridIdentity.mountPath=/etc/praxis/tls because its peer pollers read TLS files from that path" }}
+{{- $serving := include "praxis-gateway.gridServing" . | fromYaml }}
+{{- if $serving.enabled }}
+{{- $key := printf "praxisConfig.%s.gridServing" .Values.praxisConfig.source }}
+{{- if ne .Values.gridIdentity.mountPath "/etc/praxis/tls" }}
+{{- fail (printf "%s requires gridIdentity.mountPath=/etc/praxis/tls because its peer pollers read TLS files from that path" $key) }}
 {{- end }}
-{{- $name := include "praxis-gateway.servingConfigMap" $ }}
+{{- $name := include "praxis-gateway.servingConfigMap" . }}
 {{- if not $name }}
-{{- fail "praxisConfig.render.gridServing needs networkName or configMapName" }}
+{{- fail (printf "%s needs networkName or configMapName" $key) }}
 {{- end }}
 {{- if gt (len $name) 63 }}
-{{- fail (printf "praxisConfig.render.gridServing: the operator hash-suffixes %s; set configMapName to the ConfigMap labeled grid.praxis.fast/gateway" $name) }}
+{{- fail (printf "%s: the operator hash-suffixes %s; set configMapName to the ConfigMap labeled grid.praxis.fast/gateway" $key $name) }}
 {{- end }}
-{{- if not $.Values.gridIdentity.tlsSecretName }}
-{{- fail "praxisConfig.render.gridServing polls peers with the grid identity: set gridIdentity.tlsSecretName" }}
+{{- if not .Values.gridIdentity.tlsSecretName }}
+{{- fail (printf "%s polls peers with the grid identity: set gridIdentity.tlsSecretName" $key) }}
 {{- end }}
-{{- if eq ($.Values.praxisConfig.render.role | default "consumer") "provider" }}
-{{- fail "praxisConfig.render.gridServing routes callers across sites; it applies to the consumer role only" }}
+{{- if eq (.Values.praxisConfig.render.role | default "consumer") "provider" }}
+{{- fail (printf "%s routes callers across sites; it applies to the consumer role only" $key) }}
 {{- end }}
-{{- if ne $.Values.image.flavor "grid-gateway" }}
-{{- fail "praxisConfig.render.gridServing needs image.flavor grid-gateway" }}
+{{- if ne .Values.image.flavor "grid-gateway" }}
+{{- fail (printf "%s needs image.flavor grid-gateway" $key) }}
 {{- end }}
+{{- if and (eq .Values.praxisConfig.source "operator") (not .Values.mountReconciliation.enabled) }}
+{{- fail "praxisConfig.operator.gridServing needs mountReconciliation.enabled: every operator praxis.yaml revision must roll the pod so it re-reads its provider-hop backends" }}
 {{- end }}
 {{- end }}
 {{- end }}
@@ -491,11 +494,26 @@ Validate enabled mounts have a non-empty resource name.
 The operator's serving config ConfigMap for this gateway: grid-serving-<networkName>-<gatewayRefName>.
 */}}
 {{- define "praxis-gateway.servingConfigMap" -}}
-{{- $serving := .Values.praxisConfig.render.gridServing | default dict -}}
+{{- $serving := include "praxis-gateway.gridServing" . | fromYaml -}}
+{{- $operator := eq .Values.praxisConfig.source "operator" -}}
+{{- $network := $serving.networkName | default (ternary .Values.mountReconciliation.network .Values.grid.networkName $operator) -}}
+{{- $gateway := $serving.gatewayRefName | default (ternary .Values.mountReconciliation.gatewayRef "" $operator) | default (include "praxis-gateway.fullname" .) -}}
 {{- if $serving.configMapName -}}
 {{- $serving.configMapName -}}
-{{- else if $serving.networkName -}}
-{{- printf "grid-serving-%s-%s" $serving.networkName ($serving.gatewayRefName | default (include "praxis-gateway.fullname" .)) -}}
+{{- else if $network -}}
+{{- printf "grid-serving-%s-%s" $network $gateway -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+The gridServing block the selected source reads, as YAML: render's, operator's, or none.
+*/}}
+{{- define "praxis-gateway.gridServing" -}}
+{{- $source := .Values.praxisConfig.source -}}
+{{- if eq $source "render" -}}
+{{- toYaml (.Values.praxisConfig.render.gridServing | default dict) -}}
+{{- else if eq $source "operator" -}}
+{{- toYaml ((.Values.praxisConfig.operator).gridServing | default dict) -}}
 {{- end -}}
 {{- end }}
 
@@ -539,13 +557,13 @@ Listener port name: port.name when set, else https when the listener terminates 
 Probe with an empty tcpSocket pointed at the listener port.
 */}}
 {{/*
-Whether the gateway forwards to backend clusters: rendered backends, gridServing, or
-clusters in praxisConfig.byo.inline. Praxis /ready fails while any of them is down. Emits "true"
+Whether the gateway forwards to backend clusters: rendered backends, either source's gridServing,
+or clusters in praxisConfig.byo.inline. Praxis /ready fails while any of them is down. Emits "true"
 or nothing.
 */}}
 {{- define "praxis-gateway.servesBackends" -}}
 {{- $v := .Values -}}
-{{- if or (and (eq $v.praxisConfig.source "render") $v.praxisConfig.render.backends) ($v.praxisConfig.render.gridServing).enabled -}}
+{{- if or (and (eq $v.praxisConfig.source "render") $v.praxisConfig.render.backends) (include "praxis-gateway.gridServing" . | fromYaml).enabled -}}
 true
 {{- else if and (eq $v.praxisConfig.source "byo") (not $v.praxisConfig.byo.configMapName) ((fromYaml ($v.praxisConfig.byo.inline | default "")).clusters) -}}
 true
@@ -784,7 +802,7 @@ chart's own {fullname}-config for render and inline.
 {{- end -}}
 {{- end }}
 
-{{/* Full image references injected by downstream payloads; shared with sibling charts. */}}
+{{/* Full image references injected by downstream payloads. */}}
 {{- define "praxis-gateway.relatedImage" -}}
 {{- range (.root.Values.global | default dict).relatedImages -}}
 {{- if eq .name $.name -}}

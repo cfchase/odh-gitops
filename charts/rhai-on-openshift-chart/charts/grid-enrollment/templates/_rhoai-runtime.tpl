@@ -85,6 +85,16 @@
 ---
 {{ $resource }}
 {{ end }}
+{{- $resource := include "grid-enrollment.rhoai.enrollment/managed-cluster-enrollment.yaml" . | trim -}}
+{{- if $resource }}
+---
+{{ $resource }}
+{{ end }}
+{{- $resource := include "grid-enrollment.rhoai.enrollment/managed-clusters.yaml" . | trim -}}
+{{- if $resource }}
+---
+{{ $resource }}
+{{ end }}
 {{- $resource := include "grid-enrollment.rhoai.enrollment/route.yaml" . | trim -}}
 {{- if $resource }}
 ---

@@ -89,6 +89,9 @@
             },
             "createClusterSetBinding": {
               "type": "boolean"
+            },
+            "includeLocalCluster": {
+              "type": "boolean"
             }
           }
         },
@@ -819,6 +822,26 @@
         }
       ]
     },
+    "grid": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "membership": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "source": {
+              "type": "string",
+              "enum": [
+                "Swim",
+                "Local"
+              ],
+              "description": "Where sites learn their members, Swim or Local. Local creates and delivers no SWIM key."
+            }
+          }
+        }
+      }
+    },
     "hubSite": {
       "description": "Issue the hub's own site identity straight from the grid CA, so the hub never enrolls.",
       "type": "object",
@@ -940,9 +963,58 @@
         }
       }
     },
-    "initResources": {
-      "$ref": "#/definitions/resourceBudget"
+    "managedClusters": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "networkName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "clusterSet": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "clusterLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "clusterLabelValue": {
+          "type": "string",
+          "maxLength": 63
+        },
+        "createClusterSetBinding": {
+          "type": "boolean"
+        },
+        "workName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "hubClusterName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "identitySecretPrefix": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "pattern": "^[a-z0-9][a-z0-9-]*-$"
+        }
+      }
     },
+    "initResources": {},
     "networkPolicy": {
       "type": "object",
       "additionalProperties": false,

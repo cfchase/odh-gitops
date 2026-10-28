@@ -264,6 +264,18 @@ charts:
           - grid-enrollment.external.certManager.enabled=true
           - grid-enrollment.external.certManager.issuer.create=true
 
+      - name: ai-grid-managed-clusters
+        setFlags:
+          - skipCrdCheck=true
+          - profile=ai-grid
+          - grid-enrollment.fullnameOverride=grid-bootstrap
+          - grid-enrollment.mode=external
+          - grid-enrollment.grid.membership.source=Local
+          - grid-enrollment.managedClusters.enabled=true
+          - grid-enrollment.external.delivery.namespace=grid-system
+          - grid-enrollment.external.certManager.enabled=true
+          - grid-enrollment.external.certManager.issuer.create=true
+
       - name: ai-grid-generated-ca
         setFlags:
           - skipCrdCheck=true
