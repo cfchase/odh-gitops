@@ -165,8 +165,7 @@ A Helm chart for installing ODH/RHOAI dependencies and component configurations
 | dependencies.tempo.enabled | string | `"auto"` | Enable tempo: auto (if needed), true (always), false (never) |
 | global | object | `{"relatedImages":[]}` | Values shared by the optional AI Grid subcharts. |
 | global.relatedImages | list | `[]` | Full image references using the XKS name/value convention. See README.md for supported names. |
-| grid-enrollment | object | `{"enabled":true,"fullnameOverride":"grid-enrollment","image":{"digest":"sha256:cc939019b5fbe332f3effe175451df6caf73b2836b9cdb82668dbd4663b778eb"}}` | AI Grid enrollment service |
-| grid-enrollment.enabled | bool | `true` | Include enrollment when AIGateway and aiGrid are Managed. False uses an externally managed service. |
+| grid-enrollment | object | `{"fullnameOverride":"grid-enrollment","image":{"digest":"sha256:cc939019b5fbe332f3effe175451df6caf73b2836b9cdb82668dbd4663b778eb"}}` | AI Grid enrollment service |
 | grid-enrollment.fullnameOverride | string | `"grid-enrollment"` | Stable resource names, independent of the release name |
 | grid-enrollment.image.digest | string | `"sha256:cc939019b5fbe332f3effe175451df6caf73b2836b9cdb82668dbd4663b778eb"` | Grid v0.3.0-rc.2. The platform's related image replaces it downstream. |
 | labels | object | `{}` | Common labels applied to all resources |
@@ -177,11 +176,10 @@ A Helm chart for installing ODH/RHOAI dependencies and component configurations
 | operator.odh | object | `{"applicationsNamespace":"opendatahub","monitoringNamespace":"opendatahub","olm":{"channel":"fast-3","createNamespace":true,"name":"opendatahub-operator","namespace":"opendatahub-operator-system","source":"community-operators"}}` | ODH operator settings |
 | operator.rhoai | object | `{"applicationsNamespace":"redhat-ods-applications","monitoringNamespace":"redhat-ods-monitoring","olm":{"channel":"beta","createNamespace":true,"name":"rhods-operator","namespace":"redhat-ods-operator","source":"redhat-operators"}}` | RHOAI operator settings |
 | operator.type | string | `"odh"` | Operator type: odh (Open Data Hub) or rhoai (Red Hat OpenShift AI) |
-| praxis-gateway | object | `{"enabled":true,"fullnameOverride":"grid-gateway","image":{"digest":"sha256:8a0319dab9870ceed7dda389415dd108db53e422ed8070811d8933641f15be17","flavor":"grid-gateway","repository":"ghcr.io/praxis-proxy/grid-gateway","tag":"v0.3.0-rc.2"}}` | AI Grid gateway (Praxis) |
-| praxis-gateway.enabled | bool | `true` | Include the gateway when AIGateway and aiGrid are Managed. False uses an externally managed gateway. |
+| praxis-gateway | object | `{"fullnameOverride":"grid-gateway","image":{"digest":"sha256:8a0319dab9870ceed7dda389415dd108db53e422ed8070811d8933641f15be17","flavor":"grid-gateway","repository":"ghcr.io/praxis-proxy/grid-gateway","tag":"v0.3.0-rc.2"}}` | AI Grid gateway (Praxis) |
 | praxis-gateway.fullnameOverride | string | `"grid-gateway"` | Stable resource names, independent of the release name |
 | praxis-gateway.image.repository | string | `"ghcr.io/praxis-proxy/grid-gateway"` | Use the Grid gateway build, which includes Grid routing filters. |
-| profile | string | `"default"` | Deploy profile: sets default managementState for components and services. Options: default (all Removed), rhaii (inference), maas, ai-grid (Grid operator and CRDs) Explicit managementState values override the profile. |
+| profile | string | `"default"` | Deploy profile: sets default managementState for components and services. Options: default (all Removed), rhaii (inference), maas, ai-grid (Grid operator and CRDs), ai-grid-inference (AI Grid inference site: KServe and the Grid operator, no MaaS or Grid runtimes) Explicit managementState values override the profile. |
 | services.monitoring | object | `{"dependencies":{"certManager":true,"clusterObservability":true,"loki":true,"opentelemetry":true,"tempo":true},"dsci":{"alerting":{},"logs":{},"managementState":null,"metrics":{},"traces":{},"usageLogs":{}}}` | Monitoring service configuration |
 | services.monitoring.dsci.managementState | string | `nil` | Management state for monitoring. Null uses profile default or Removed. |
 | skipCrdCheck | bool | `false` | Skip CRD existence check - render all CRs regardless. Set to true for ArgoCD. |
