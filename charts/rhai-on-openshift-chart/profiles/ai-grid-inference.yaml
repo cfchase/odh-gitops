@@ -1,0 +1,25 @@
+# AI Grid inference profile - an AI Grid site that serves models to the grid
+# Enables KServe for model serving and AIGateway with only aiGrid (the Grid operator).
+# MaaS and the dashboard stay Removed: callers reach this site's models through another
+# cluster's MaaS gateway. The Grid gateway and enrollment runtimes are off: enrollment
+# runs on the grid hub, and the gateway in front of MaaS runs on ingress sites.
+# Dependencies auto-installed (through kserve): cert-manager, leader-worker-set, RHCL/Kuadrant
+components:
+  aigateway:
+    dependencies:
+      certManager: false
+      leaderWorkerSet: false
+      rhcl: false
+    dsc:
+      managementState: Managed
+      aiGrid:
+        managementState: Managed
+  kserve:
+    dependencies:
+      jobSet: false
+    dsc:
+      managementState: Managed
+grid-enrollment:
+  enabled: false
+praxis-gateway:
+  enabled: false

@@ -197,6 +197,7 @@ Profiles provide preconfigured deployment types that set the right `managementSt
 | `rhaii` | RHAII inference/model-serving stack | kserve | certManager, leaderWorkerSet, rhcl |
 | `maas` | Models as a Service platform | aigateway (with `modelsAsAService`), kserve | certManager, rhcl |
 | `ai-grid` | AI Grid multi-cluster routing | aigateway (aiGrid) | None |
+| `ai-grid-inference` | AI Grid inference site: serves models to the grid, no MaaS | aigateway (aiGrid), kserve | certManager, leaderWorkerSet, rhcl |
 
 With ordinary chart defaults, the `maas` profile installs `certManager` and `rhcl` (through `kserve`) but not
 `leaderWorkerSet` — `aigateway`'s `null` dependency default for it is not activated. Enable it explicitly
@@ -224,6 +225,13 @@ Setting either state to `Removed` suppresses both runtimes on the next Helm upgr
 sync with pruning enabled, even if their `enabled` flags remain `true`. Editing the live DSC
 alone does not update a Helm release.
 Set an individual runtime's `enabled: false` to supply that service externally.
+
+`--set profile=ai-grid-inference` configures an inference site: a cluster that serves models to
+the grid but runs no MaaS and no portal. It sets KServe and AIGateway with only `aiGrid` to
+`Managed`, leaves `modelsAsAService` and the dashboard `Removed`, and turns off both runtimes:
+enrollment runs on the grid hub, and the gateway in front of MaaS runs on ingress sites. Tenants
+reach the site's models through another cluster's MaaS gateway. A runtime's `enabled` is unset by
+default, so the profile decides; an explicit `enabled: true` or `false` overrides it.
 
 Use [`values-ai-grid-hub.yaml`](../../docs/examples/values-ai-grid-hub.yaml) to configure a
 hub's hostname, gateway ConfigMap and database Secret. The profile defaults render the upstream
@@ -298,6 +306,7 @@ when testing a custom payload, rather than setting a Helm-managed operator image
 - **Explicit values always win**: setting `--set components.kserve.dsc.managementState=Removed` overrides the profile
 - Profile `default` preserves the standard behavior — all components are `Removed` unless you enable them manually
 - Profiles also control component dependency defaults (e.g., `rhaii` disables `jobSet` for kserve since it's not needed for inference-only deployments)
+- Profiles can also set the AI Grid runtimes' `grid-enrollment.enabled` and `praxis-gateway.enabled` (e.g., `ai-grid-inference` turns both off); an explicit value overrides the profile
 
 ### Example: RHAII deployment
 
@@ -701,7 +710,7 @@ dependencies:
 ### Global Settings
 
 ```yaml
-# Deployment profile: default (all Removed), rhaii, maas
+# Deployment profile: default (all Removed), rhaii, maas, ai-grid, ai-grid-inference
 # Explicit managementState values override the profile.
 profile: default
 

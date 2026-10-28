@@ -341,6 +341,7 @@ services:
 ```
 
 Only include the components/services you want to change from the default (`Removed`). Dependencies are auto-resolved based on active components.
+A profile can also set `grid-enrollment.enabled` and `praxis-gateway.enabled` to choose whether the AI Grid runtimes render; see `profiles/ai-grid-inference.yaml`.
 
 #### Step 2: Update JSON Schema
 

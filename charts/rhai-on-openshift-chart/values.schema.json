@@ -39,7 +39,7 @@
       "properties": {
         "enabled": {
           "type": "boolean",
-          "default": true
+          "description": "Unset uses the profile default, then true. False uses an externally managed service."
         }
       }
     },
@@ -49,15 +49,15 @@
       "properties": {
         "enabled": {
           "type": "boolean",
-          "default": true
+          "description": "Unset uses the profile default, then true. False uses an externally managed service."
         }
       }
     },
     "profile": {
       "type": "string",
-      "enum": ["default", "maas", "ai-grid", "rhaii"],
+      "enum": ["default", "maas", "ai-grid", "ai-grid-inference", "rhaii"],
       "default": "default",
-      "description": "Deploy profile that sets default component managementStates. 'default' keeps all components Removed. 'maas' enables AIGateway with modelsAsAService + KServe for MaaS deployments. 'ai-grid' enables AIGateway with only the aiGrid sub-component. 'rhaii' enables only KServe for inference/model serving. Explicit managementState values override the profile."
+      "description": "Deploy profile that sets default component managementStates. 'default' keeps all components Removed. 'maas' enables AIGateway with modelsAsAService + KServe for MaaS deployments. 'ai-grid' enables AIGateway with only the aiGrid sub-component. 'ai-grid-inference' enables KServe and AIGateway with only aiGrid, and turns off the Grid gateway and enrollment runtimes, for an AI Grid site that serves models without MaaS. 'rhaii' enables only KServe for inference/model serving. Explicit managementState values override the profile."
     },
     "olm": {
       "type": "object",

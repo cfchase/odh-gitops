@@ -245,6 +245,24 @@ charts:
           - profile=ai-grid
           - grid-enrollment.enabled=false
 
+      - name: ai-grid-inference-profile
+        setFlags:
+          - skipCrdCheck=true
+          - operator.type=rhoai
+          - profile=ai-grid-inference
+        setJsonFlags:
+          - 'components.kserve.gateway.spec.listeners[0].allowedRoutes.namespaces={"from":"Selector","selector":{"matchLabels":{"grid.opendatahub.io/allowed":"true"}}}'
+
+      # An explicit runtime toggle overrides the profile's runtime default
+      - name: ai-grid-inference-with-gateway
+        setFlags:
+          - skipCrdCheck=true
+          - operator.type=rhoai
+          - profile=ai-grid-inference
+          - praxis-gateway.enabled=true
+        setJsonFlags:
+          - 'components.kserve.gateway.spec.listeners[0].allowedRoutes.namespaces={"from":"Selector","selector":{"matchLabels":{"grid.opendatahub.io/allowed":"true"}}}'
+
       - name: ai-grid-external-identities
         setFlags:
           - skipCrdCheck=true

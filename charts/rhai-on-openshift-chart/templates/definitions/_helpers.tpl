@@ -771,3 +771,25 @@ true
 true
 {{- end -}}
 {{- end }}
+
+{{/*
+=============================================================================
+Resolve whether an AI Grid runtime subchart (grid-enrollment, praxis-gateway)
+renders. An explicit <name>.enabled value wins; null uses the profile's
+<name>.enabled, then true. Helm loads the subchart unless enabled is false.
+=============================================================================
+Arguments (passed as dict):
+  - root: root context ($)
+  - name: the runtime subchart name
+*/}}
+{{- define "rhoai-dependencies.aiGridRuntimeEnabled" -}}
+{{- $enabled := index (index .root.Values .name | default dict) "enabled" -}}
+{{- if kindIs "invalid" $enabled -}}
+  {{- $profile := .root.Values.profile | default "default" -}}
+  {{- $profileValues := .root.Files.Get (printf "profiles/%s.yaml" $profile) | fromYaml | default dict -}}
+  {{- $enabled = dig "enabled" true (index $profileValues .name | default dict) -}}
+{{- end -}}
+{{- if $enabled -}}
+true
+{{- end -}}
+{{- end }}
