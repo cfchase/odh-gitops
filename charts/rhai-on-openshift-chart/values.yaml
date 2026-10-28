@@ -293,6 +293,17 @@ components:
             #     name: <SECRET_NAME>
             #   mode: Terminate
 
+      # -- Grid identity used by the KServe model controller to call Grid providers.
+      gridModelClient:
+        # -- Create the Grid model-client identity: auto (when KServe and AI Grid are Managed), true (always), false (never).
+        create: auto
+        # -- Namespace that owns the Grid model-client identity.
+        namespace: redhat-ai-grid
+        # -- ServiceAccount used by the KServe model controller.
+        serviceAccountName: grid-model-client
+        # -- Secret that stores the ServiceAccount token.
+        tokenSecretName: grid-model-client-token
+
   # -- Kueue job queuing component
   kueue:
     # -- Dependencies required by Kueue

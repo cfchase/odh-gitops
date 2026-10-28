@@ -42,6 +42,13 @@ charts:
           - skipCrdCheck=true
           - tags.install-with-helm-dependencies=true
 
+      - name: kserve-grid-model-client
+        setFlags:
+          - skipCrdCheck=true
+          - components.aigateway.dsc.managementState=Managed
+          - components.aigateway.dsc.aiGrid.managementState=Managed
+          - components.kserve.dsc.managementState=Managed
+
       - name: inference-only
         setFlags:
           - skipCrdCheck=true

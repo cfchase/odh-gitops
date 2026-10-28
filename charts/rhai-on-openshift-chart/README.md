@@ -549,6 +549,36 @@ components:
 # will be auto-installed because kserve is Managed
 ```
 
+### Example: Enable the Grid model-client identity
+
+```yaml
+# values.yaml
+components:
+  kserve:
+    dsc:
+      managementState: Managed
+    gateway:
+      annotations:
+        grid.opendatahub.io/serving: >-
+          {
+            "networkName": "grid",
+            "namespace": "redhat-ai-grid",
+            "serviceAccount": "grid-model-client",
+            "tokenSecret": "grid-model-client-token",
+            "publishMetrics": true
+          }
+  aigateway:
+    dsc:
+      managementState: Managed
+      aiGrid:
+        managementState: Managed
+```
+
+When `components.kserve.gateway.gridModelClient.create` is `auto` (the default),
+the ServiceAccount and token Secret are created because KServe and AI Grid are
+Managed. Keep the annotation's Grid identity fields synchronized with the values
+under `components.kserve.gateway.gridModelClient`.
+
 ### Example: Skip a dependency you already have
 
 ```yaml

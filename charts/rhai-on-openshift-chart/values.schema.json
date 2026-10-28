@@ -1169,9 +1169,40 @@
           },
           "required": ["enabled", "name", "host", "gatewayParametersName", "servingCertSecretName"],
           "additionalProperties": false
+        },
+        "gridModelClient": {
+          "$ref": "#/definitions/gridModelClientConfig"
         }
       },
       "required": ["create", "name", "namespace", "spec"],
+      "additionalProperties": false
+    },
+    "gridModelClientConfig": {
+      "type": "object",
+      "description": "Grid model-client identity used by the KServe model controller",
+      "properties": {
+        "create": {
+          "$ref": "#/definitions/triStateEnabled",
+          "default": "auto",
+          "description": "Create the Grid model-client identity: auto (when KServe and AI Grid are Managed), true (always), false (never)"
+        },
+        "namespace": {
+          "type": "string",
+          "default": "redhat-ai-grid",
+          "description": "Namespace that owns the Grid model-client identity"
+        },
+        "serviceAccountName": {
+          "type": "string",
+          "default": "grid-model-client",
+          "description": "ServiceAccount used by the KServe model controller"
+        },
+        "tokenSecretName": {
+          "type": "string",
+          "default": "grid-model-client-token",
+          "description": "Secret that stores the ServiceAccount token"
+        }
+      },
+      "required": ["create", "namespace", "serviceAccountName", "tokenSecretName"],
       "additionalProperties": false
     },
     "gatewayClassConfig": {
