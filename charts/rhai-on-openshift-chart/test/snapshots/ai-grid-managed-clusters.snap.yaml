@@ -99,6 +99,12 @@ rules:
 - apiGroups: [cluster.open-cluster-management.io]
   resources: [managedclusters]
   verbs: [get, list, watch]
+# Hub templates can resolve before the hub policy creates observers. Keep their
+# read permission in the release so inventory additions need no RBAC round trip.
+- apiGroups: [work.open-cluster-management.io]
+  resources: [manifestworks]
+  resourceNames: ["grid-site-observer"]
+  verbs: [get, list, watch]
 
 ---
 # Source: rhai-on-openshift-chart/templates/components/ai-grid.yaml
@@ -481,7 +487,6 @@ spec:
           {{hub $clusterSet := "default" hub}}
           {{hub $workName := "grid-site-observer" hub}}
           {{hub $namespace := "default" hub}}
-          {{hub $account := "grid-bootstrap-membership" hub}}
           {{hub $secretPrefix := "grid-site-" hub}}
           - complianceType: musthave
             objectDefinition:
@@ -564,33 +569,6 @@ spec:
                     - {name: region, path: .spec.region}
                     - {name: zone, path: .spec.zone}
                     - {name: sovereigntyZone, path: .spec.sovereigntyZone}
-          - complianceType: musthave
-            objectDefinition:
-              apiVersion: rbac.authorization.k8s.io/v1
-              kind: Role
-              metadata:
-                name: {{hub printf "%q" $workName hub}}
-                namespace: {{hub printf "%q" $site hub}}
-              rules:
-              - apiGroups: [work.open-cluster-management.io]
-                resources: [manifestworks]
-                resourceNames: [{{hub printf "%q" $workName hub}}]
-                verbs: [get, list, watch]
-          - complianceType: musthave
-            objectDefinition:
-              apiVersion: rbac.authorization.k8s.io/v1
-              kind: RoleBinding
-              metadata:
-                name: {{hub printf "%q" $workName hub}}
-                namespace: {{hub printf "%q" $site hub}}
-              roleRef:
-                apiGroup: rbac.authorization.k8s.io
-                kind: Role
-                name: {{hub printf "%q" $workName hub}}
-              subjects:
-              - kind: ServiceAccount
-                name: {{hub printf "%q" $account hub}}
-                namespace: {{hub printf "%q" $namespace hub}}
           
           {{hub end hub}}
           {{hub end hub}}
