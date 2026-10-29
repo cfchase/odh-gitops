@@ -1,7 +1,8 @@
 #!/bin/bash
 # Vendor the AI Grid charts from praxis-proxy/grid as unpacked subcharts of
-# rhai-on-openshift-chart, so installs need no `helm dependency build`, and
-# refresh the dependency versions, docs and snapshots.
+# rhai-on-openshift-chart, so installs need no `helm dependency build`, copy its
+# CRDs into components/ai-grid-crds, and refresh the dependency versions, docs
+# and snapshots.
 # This overwrites the vendored charts: review `git diff` for local edits it drops.
 # Usage: ./scripts/update-ai-grid-charts.sh <git-ref>
 # Examples:
@@ -49,6 +50,13 @@ for chart in "${CHARTS[@]}"; do
   "$YQ" -i "(.dependencies[] | select(.name == \"$chart\") | .version) = \"$version\"" "$PARENT/Chart.yaml"
   echo "  $chart $version"
 done
+
+# The CRD carry tracks the same commit, so charts and schemas never skew.
+CRDS="$ROOT/components/ai-grid-crds"
+rm -f "$CRDS"/base/*.yaml
+git -C "$TMP_DIR/grid" archive "$SHA" deploy/crds | tar -x --strip-components=2 -C "$CRDS/base"
+sed -i -E "s#\[\`praxis-proxy/grid\` at \`[0-9a-f]+\`\]\(https://github.com/praxis-proxy/grid/tree/[0-9a-f]+/deploy/crds\)#[\`praxis-proxy/grid\` at \`${SHA:0:7}\`](https://github.com/praxis-proxy/grid/tree/${SHA}/deploy/crds)#" "$CRDS/README.md"
+grep -q "tree/${SHA}/deploy/crds" "$CRDS/README.md" || { echo "CRD carry README names no commit link to update" >&2; exit 1; }
 
 python3 "$ROOT/scripts/adapt-ai-grid-charts.py"
 # Preserve reviewed downstream hardening until it is carried upstream. Fail on

@@ -1,7 +1,7 @@
 # Temporary AI Grid CRD carry
 
 This opt-in Kustomize overlay carries the five Grid CRDs from
-[`praxis-proxy/grid` at `74a11ef`](https://github.com/praxis-proxy/grid/tree/74a11ef867b1f0bb2eaf48f391b92ce0da27b308/deploy/crds)
+[`praxis-proxy/grid` at `f81f979`](https://github.com/praxis-proxy/grid/tree/f81f979a8b10690216cc4bc766faac48c7f55ce2/deploy/crds)
 while the downstream RHOAI operator's manifest bundle catches up. The files in
 `base/` are unchanged copies of that commit's `deploy/crds/` directory. The
 schemas already exist upstream; this overlay only adds GitOps ownership metadata.
@@ -25,8 +25,9 @@ path: components/ai-grid-crds
 
 The overlay is not included in the repository's default Kustomize installation
 or any Helm chart. It changes no Deployments, identities, or membership settings.
-The schemas include the v0.3.0-rc.1 fields and the optional GridNetwork
-`spec.membership.mode` declaration. Before setting that declaration or enabling
+The schemas match the commit above, including the optional GridNetwork
+`spec.membership.mode` declaration. `scripts/update-ai-grid-charts.sh` refreshes
+them from the same commit as the vendored charts. Before setting that declaration or enabling
 bootstrap-owned grid identity, deploy operator and enrollment images that
 support those features on every applicable cluster. Updating CRDs alone does
 not change the running membership mode.
