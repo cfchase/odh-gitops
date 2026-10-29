@@ -750,7 +750,11 @@ spec:
                     serverName: {{hub if ne $gatewayServerName "" hub}}{{hub printf "%q" $gatewayServerName hub}}{{hub else hub}}{{hub printf "%q" (printf "%s.grid.internal" $site) hub}}{{hub end hub}}
                 # Clear fields that disappeared from the source instead of retaining an
                 # old endpoint or a certificate pin from a previous discovery mode.
-                egress: null
+                # Never write the legacy `egress` key, not even as null: the CRD keeps
+                # a null nullable field, CEL treats it as absent, but the operator's
+                # serde alias rejects `egress` beside `gatewayEndpoint` as a duplicate
+                # field and fails every GridSite list. A non-null legacy value is
+                # refused by the CRD's CEL rule, so this policy reports it.
                 trust: null
                 {{hub if or (ne $signalsAddress "") (ne $signalsServerName "") hub}}
                 signalsEndpoint:
