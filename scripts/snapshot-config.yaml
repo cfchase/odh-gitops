@@ -270,6 +270,7 @@ charts:
           - profile=ai-grid
           - grid-enrollment.fullnameOverride=grid-bootstrap
           - grid-enrollment.mode=external
+          - grid-enrollment.gridIdentity.enabled=true
           - grid-enrollment.grid.membership.source=Local
           - grid-enrollment.managedClusters.enabled=true
           - grid-enrollment.external.delivery.namespace=grid-system

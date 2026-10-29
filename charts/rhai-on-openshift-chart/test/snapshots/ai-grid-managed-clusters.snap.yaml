@@ -105,6 +105,10 @@ rules:
     resources: [manifestworks]
     resourceNames: ["grid-site-observer"]
     verbs: [get, list, watch]
+  - apiGroups: [""]
+    resources: [configmaps]
+    resourceNames: ["grid-bootstrap-state"]
+    verbs: [get, list, watch]
 
 ---
 # Source: rhai-on-openshift-chart/templates/components/ai-grid.yaml
@@ -462,7 +466,7 @@ metadata:
   name: grid-bootstrap-membership-hub
   namespace: default
   annotations:
-    policy.open-cluster-management.io/trigger-update: "42be75fc23f837fb149ed45d5b88cdacd9402063c569898702bb1e1f0526d774"
+    policy.open-cluster-management.io/trigger-update: "9e13da720620b5377550978b51cf593e7b82d7135035d8209940d2a8ee9936ec"
 spec:
   remediationAction: enforce
   disabled: false
@@ -640,7 +644,7 @@ metadata:
   namespace: default
   annotations:
     # A denied lookup cannot watch its dependency; RBAC changes must retry it.
-    policy.open-cluster-management.io/trigger-update: "42be75fc23f837fb149ed45d5b88cdacd9402063c569898702bb1e1f0526d774"
+    policy.open-cluster-management.io/trigger-update: "9e13da720620b5377550978b51cf593e7b82d7135035d8209940d2a8ee9936ec"
 spec:
   remediationAction: enforce
   disabled: false
@@ -668,6 +672,16 @@ spec:
           {{hub $workName := "grid-site-observer" hub}}
           {{hub $namespace := "grid-system" hub}}
           {{hub $clusterSet := "default" hub}}
+          {{ range $name := (list "gridnetworks.grid.praxis.fast" "gridsites.grid.praxis.fast") }}
+          {{ $crd := lookup "apiextensions.k8s.io/v1" "CustomResourceDefinition" "" $name }}
+          {{ $established := false }}
+          {{ range $condition := $crd.status.conditions }}
+          {{ if and (eq $condition.type "Established") (eq $condition.status "True") }}
+          {{ $established = true }}
+          {{ end }}
+          {{ end }}
+          {{ if not $established }}{{ fail (printf "waiting for CRD %s to be Established" $name) }}{{ end }}
+          {{ end }}
           {{hub $members := (lookup "cluster.open-cluster-management.io/v1" "ManagedCluster" "" "").items hub}}
           - complianceType: musthave
             objectDefinition:
@@ -760,6 +774,74 @@ spec:
           {{hub end hub}}
           {{hub end hub}}
           {{hub end hub}}
+  - objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        name: grid-bootstrap-membership-network
+      spec:
+        remediationAction: enforce
+        severity: high
+        evaluationInterval:
+          compliant: watch
+          noncompliant: watch
+        # A membership removal must not delete the grid or reset its identity.
+        pruneObjectBehavior: None
+        object-templates-raw: |
+          {{hub $stateNamespace := "default" hub}}
+          {{hub $stateName := "grid-bootstrap-state" hub}}
+          {{hub $network := "grid" hub}}
+          {{hub $namespace := "grid-system" hub}}
+          {{hub $identity := "grid-site-identity" hub}}
+          {{hub $ca := "grid-ca" hub}}
+          {{hub $gateway := "grid-gateway" hub}}
+          {{ range $name := (list "gridnetworks.grid.praxis.fast" "gridsites.grid.praxis.fast") }}
+          {{ $crd := lookup "apiextensions.k8s.io/v1" "CustomResourceDefinition" "" $name }}
+          {{ $established := false }}
+          {{ range $condition := $crd.status.conditions }}
+          {{ if and (eq $condition.type "Established") (eq $condition.status "True") }}
+          {{ $established = true }}
+          {{ end }}
+          {{ end }}
+          {{ if not $established }}{{ fail (printf "waiting for CRD %s to be Established" $name) }}{{ end }}
+          {{ end }}
+          {{hub $state := lookup "v1" "ConfigMap" $stateNamespace $stateName hub}}
+          {{hub $id := index $state.data "gridId" hub}}
+          {{hub if not $id hub}}{{hub fail "waiting for bootstrap grid identity" hub}}{{hub end hub}}
+          {{ $namespace := {{hub printf "%q" $namespace hub}} }}
+          {{ $identity := {{hub printf "%q" $identity hub}} }}
+          {{ $ca := {{hub printf "%q" $ca hub}} }}
+          {{ if not (lookup "v1" "Secret" $namespace $identity).metadata.name }}
+          {{ fail "waiting for the enrolled site identity" }}{{ end }}
+          {{ if not (lookup "v1" "Secret" $namespace $ca).metadata.name }}
+          {{ fail "waiting for the grid trust bundle" }}{{ end }}
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: grid.praxis.fast/v1alpha1
+              kind: GridNetwork
+              metadata:
+                name: {{hub printf "%q" $network hub}}
+              spec:
+                gridId: {{hub printf "%q" $id hub}}
+                membership:
+                  mode: Local
+                signalTransport:
+                  mode: poll
+                peerTrust:
+                  mode: spiffe
+                tls:
+                  siteSecretRef:
+                    name: {{hub printf "%q" $identity hub}}
+                    namespace: {{hub printf "%q" $namespace hub}}
+                  caSecretRef:
+                    name: {{hub printf "%q" $ca hub}}
+                    namespace: {{hub printf "%q" $namespace hub}}
+                {{hub if $gateway hub}}
+                consumerGateways:
+                - name: {{hub printf "%q" $gateway hub}}
+                  namespace: {{hub printf "%q" $namespace hub}}
+                  siteName: {{hub printf "%q" .ManagedClusterName hub}}
+                {{hub end hub}}
 
 
 ---
@@ -782,3 +864,175 @@ spec:
     env:
     - name: DISABLE_DSC_CONFIG
       value: "true"
+---
+# Source: rhai-on-openshift-chart/templates/components/ai-grid.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: grid-bootstrap-ca-bootstrap
+  namespace: default
+  labels:
+    helm.sh/chart: HELM_CHART_VERSION_REDACTED
+    app.kubernetes.io/name: grid-enrollment
+    app.kubernetes.io/instance: release-test
+    app.kubernetes.io/version: "v0.3.0-rc.1"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation
+automountServiceAccountToken: false
+
+---
+# Source: rhai-on-openshift-chart/templates/components/ai-grid.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: default-grid-bootstrap-ca-bootstrap-d7e7479f
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation
+rules:
+  - apiGroups: [grid.praxis.fast]
+    resources: [gridnetworks]
+    resourceNames: ["grid"]
+    verbs: [get]
+
+---
+# Source: rhai-on-openshift-chart/templates/components/ai-grid.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: default-grid-bootstrap-ca-bootstrap-d7e7479f
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: default-grid-bootstrap-ca-bootstrap-d7e7479f
+subjects:
+  - kind: ServiceAccount
+    name: grid-bootstrap-ca-bootstrap
+    namespace: default
+
+
+---
+# Source: rhai-on-openshift-chart/templates/components/ai-grid.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: grid-bootstrap-ca-bootstrap
+  namespace: default
+  labels:
+    helm.sh/chart: HELM_CHART_VERSION_REDACTED
+    app.kubernetes.io/name: grid-enrollment
+    app.kubernetes.io/instance: release-test
+    app.kubernetes.io/version: "v0.3.0-rc.1"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation
+rules:
+  - apiGroups: [""]
+    resources: [configmaps]
+    verbs: [create]
+  - apiGroups: [""]
+    resources: [configmaps]
+    resourceNames: ["grid-bootstrap-state"]
+    verbs: [get]
+
+---
+# Source: rhai-on-openshift-chart/templates/components/ai-grid.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: grid-bootstrap-ca-bootstrap
+  namespace: default
+  labels:
+    helm.sh/chart: HELM_CHART_VERSION_REDACTED
+    app.kubernetes.io/name: grid-enrollment
+    app.kubernetes.io/instance: release-test
+    app.kubernetes.io/version: "v0.3.0-rc.1"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: grid-bootstrap-ca-bootstrap
+subjects:
+  - kind: ServiceAccount
+    name: grid-bootstrap-ca-bootstrap
+    namespace: default
+
+---
+# Source: rhai-on-openshift-chart/templates/components/ai-grid.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: grid-bootstrap-ca-bootstrap
+  namespace: default
+  labels:
+    helm.sh/chart: HELM_CHART_VERSION_REDACTED
+    app.kubernetes.io/name: grid-enrollment
+    app.kubernetes.io/instance: release-test
+    app.kubernetes.io/version: "v0.3.0-rc.1"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: ca-bootstrap
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    # Kept for its logs until the next hook run or its TTL.
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  ttlSecondsAfterFinished: 86400
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: grid-enrollment
+        app.kubernetes.io/instance: release-test
+    spec:
+      enableServiceLinks: false
+      restartPolicy: Never
+      serviceAccountName: grid-bootstrap-ca-bootstrap
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ca-bootstrap
+          image: "ghcr.io/praxis-proxy/grid-enrollment@sha256:f84f4d3d04922b196b7a743ea3ea49c0f383481e2c9f3c56719305843f4b223a"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          command: ["enrollment", "bootstrap"]
+          env:
+            - name: RUST_LOG
+              value: "info"
+          args:
+            - "--namespace"
+            - "default"
+            - "--grid-id-config-map"
+            - "grid-bootstrap-state"
+            - "--grid-network"
+            - "grid"
+            - "--skip-ca"
+          resources:
+            limits:
+              cpu: 500m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi

@@ -1,13 +1,14 @@
 # Temporary AI Grid CRD carry
 
 This opt-in Kustomize overlay carries the five Grid CRDs from
-[`praxis-proxy/grid` v0.3.0-rc.1](https://github.com/praxis-proxy/grid/tree/14b7f5fe3e1de41203847b40c870a6c2562d1abb/deploy/crds)
+[`praxis-proxy/grid` at `74a11ef`](https://github.com/praxis-proxy/grid/tree/74a11ef867b1f0bb2eaf48f391b92ce0da27b308/deploy/crds)
 while the downstream RHOAI operator's manifest bundle catches up. The files in
 `base/` are unchanged copies of that commit's `deploy/crds/` directory. The
 schemas already exist upstream; this overlay only adds GitOps ownership metadata.
 
 Updating the Grid runtime image does not update the platform's bundled schemas.
-In particular, the older GridSite schema prunes `spec.signalsEndpoint`. Restarting
+In particular, older schemas prune GridSite `spec.signalsEndpoint` and the
+GridNetwork `spec.membership` declaration. Restarting
 the Grid operator, or toggling the AI Gateway component's management state, does
 not supply a newer manifest bundle.
 
@@ -24,7 +25,11 @@ path: components/ai-grid-crds
 
 The overlay is not included in the repository's default Kustomize installation
 or any Helm chart. It changes no Deployments, identities, or membership settings.
-Use it only with Grid runtimes compatible with v0.3.0-rc.1 on every target cluster.
+The schemas include the v0.3.0-rc.1 fields and the optional GridNetwork
+`spec.membership.mode` declaration. Before setting that declaration or enabling
+bootstrap-owned grid identity, deploy operator and enrollment images that
+support those features on every applicable cluster. Updating CRDs alone does
+not change the running membership mode.
 
 `opendatahub.io/managed: "false"` makes the platform deploy action skip these
 individual CRDs. The AI Gateway component and its workloads remain Managed.
@@ -42,7 +47,8 @@ kubectl --context "$TARGET_CONTEXT" apply --server-side --force-conflicts \
 ```
 
 After Argo sync, check all five CRDs are Established and the GridSite schema has
-`spec.signalsEndpoint`. Confirm the schema and unmanaged annotation remain present
+`spec.signalsEndpoint` and the GridNetwork schema has `spec.membership.mode`.
+Confirm the schemas and unmanaged annotation remain present
 through platform reconciliation, and that Grid workloads remain ready. A server
 dry run validates the schemas but does not prove reconciliation behavior.
 
