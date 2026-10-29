@@ -775,7 +775,7 @@ true
 {{/*
 =============================================================================
 Resolve whether an AI Grid runtime subchart (grid-enrollment, praxis-gateway)
-renders. An explicit <name>.enabled value wins; null uses the profile's
+renders. An explicit <name>.enabled value wins; unset uses the profile's
 <name>.enabled, then true. Helm loads the subchart unless enabled is false.
 =============================================================================
 Arguments (passed as dict):
